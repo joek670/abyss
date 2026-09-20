@@ -1,0 +1,210 @@
+/* ============================================================================
+   tokens.css — the design system's single source of truth.
+
+   Two themes ship: `abyss` (default) and `daylight`. They are not inversions of
+   each other — daylight is a warm paper theme intended for reading the atlas in
+   a bright room, and it has its own accent tuned for contrast on paper rather
+   than on black water. Everything else in the stylesheet reads these variables
+   and never a literal colour, so a theme is a single block of overrides.
+   ========================================================================= */
+
+:root {
+  /* ── Type ─────────────────────────────────────────────────────────────
+     No webfonts: the application must render identically with the network
+     unplugged, and a self-hosted font would add ~100 kB to first paint for
+     a difference most readers will never notice. Each stack leads with the
+     best face that actually ships on the major desktop platforms.        */
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua",
+                  Georgia, ui-serif, serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI",
+               Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, "SF Mono",
+               "JetBrains Mono", "Roboto Mono", Consolas, "Liberation Mono", monospace;
+
+  /* Fluid type scale. Every step interpolates between a 360 px and a 1600 px
+     viewport, so nothing needs a media query to stay readable. */
+  --t--2: clamp(0.694rem, 0.68rem + 0.07vw, 0.75rem);
+  --t--1: clamp(0.8rem, 0.78rem + 0.1vw, 0.875rem);
+  --t-0:  clamp(0.95rem, 0.92rem + 0.15vw, 1.0625rem);
+  --t-1:  clamp(1.1rem, 1.05rem + 0.25vw, 1.3rem);
+  --t-2:  clamp(1.3rem, 1.2rem + 0.5vw, 1.7rem);
+  --t-3:  clamp(1.6rem, 1.4rem + 1vw, 2.4rem);
+  --t-4:  clamp(2rem, 1.6rem + 2vw, 3.4rem);
+  --t-5:  clamp(2.2rem, 1.6rem + 3vw, 4rem);
+  /* The hero headline. Deliberately capped well below the display maximum: at
+     1440x900 anything past ~80px pushes the lede, the call to action and the
+     headline figures below the fold, which is a worse first impression than a
+     slightly smaller headline. */
+  --t-6:  clamp(2.4rem, 1.35rem + 3.7vw, 5rem);
+
+  --lh-tight: 1.06;
+  --lh-snug: 1.25;
+  --lh-body: 1.65;
+  --lh-loose: 1.8;
+
+  --tr-tight: -0.022em;
+  --tr-normal: -0.005em;
+  --tr-wide: 0.06em;
+  --tr-wider: 0.16em;
+
+  /* ── Space ──────────────────────────────────────────────────────────── */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --s-8: 4rem;
+  --s-9: 6rem;
+  --s-10: 8rem;
+  --s-11: 12rem;
+
+  /* ── Radii ──────────────────────────────────────────────────────────── */
+  --r-1: 4px;
+  --r-2: 7px;
+  --r-3: 11px;
+  --r-4: 16px;
+  --r-5: 24px;
+  --r-full: 999px;
+
+  /* ── Layout ─────────────────────────────────────────────────────────── */
+  --rail-w: 92px;
+  --topbar-h: 62px;
+  --strip-h: 68px;
+  --measure: 68ch;
+  --page-max: 1320px;
+  --gutter: clamp(1rem, 4vw, 3.5rem);
+
+  /* ── Motion ─────────────────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --d-fast: 130ms;
+  --d-base: 240ms;
+  --d-slow: 460ms;
+  --d-reveal: 700ms;
+
+  /* ── Elevation ──────────────────────────────────────────────────────── */
+  --z-water: 0;
+  --z-content: 1;
+  --z-rail: 30;
+  --z-topbar: 40;
+  --z-strip: 45;
+  --z-drawer: 60;
+  --z-palette: 70;
+  --z-toast: 80;
+}
+
+/* ── Abyss (default) ──────────────────────────────────────────────────── */
+:root,
+[data-theme="abyss"] {
+  color-scheme: dark;
+
+  --bg-void: #01050a;
+  --bg-0: #02070d;
+  --bg-1: #04101a;
+  --bg-2: #071a28;
+  --bg-3: #0b2434;
+
+  --surface-1: rgba(255, 255, 255, 0.036);
+  --surface-2: rgba(255, 255, 255, 0.062);
+  --surface-3: rgba(255, 255, 255, 0.095);
+  --surface-solid: #061622;
+  --surface-glass: rgba(3, 12, 20, 0.72);
+
+  --line-1: rgba(140, 200, 230, 0.13);
+  --line-2: rgba(140, 200, 230, 0.22);
+  --line-strong: rgba(160, 220, 245, 0.4);
+
+  --text-0: #e9f4fa;
+  --text-1: #a6c0d0;
+  --text-2: #6f8b9d;
+  --text-3: #4a6273;
+
+  --accent: #4fe3d0;
+  --accent-soft: rgba(79, 227, 208, 0.14);
+  --accent-line: rgba(79, 227, 208, 0.38);
+  --accent-ink: #02120f;
+
+  --lure: #ffb454;
+  --lure-soft: rgba(255, 180, 84, 0.14);
+  --lure-line: rgba(255, 180, 84, 0.36);
+
+  --danger: #ff6b6b;
+  --danger-soft: rgba(255, 107, 107, 0.13);
+  --ok: #6ee7a8;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 6px 24px -8px rgba(0, 0, 0, 0.7);
+  --shadow-3: 0 24px 64px -16px rgba(0, 0, 0, 0.85);
+  --shadow-glow: 0 0 32px -6px rgba(79, 227, 208, 0.35);
+
+  --water-top: #0d5f80;
+  --water-mid: #062f4a;
+  --water-deep: #020a12;
+  --ray-opacity: 0.5;
+  --snow-opacity: 0.75;
+  --grid-line: rgba(140, 200, 230, 0.09);
+}
+
+/* ── Daylight ─────────────────────────────────────────────────────────── */
+[data-theme="daylight"] {
+  color-scheme: light;
+
+  --bg-void: #ece7dd;
+  --bg-0: #f7f4ee;
+  --bg-1: #fffdf9;
+  --bg-2: #f2ede3;
+  --bg-3: #e8e1d3;
+
+  --surface-1: rgba(12, 40, 56, 0.035);
+  --surface-2: rgba(12, 40, 56, 0.06);
+  --surface-3: rgba(12, 40, 56, 0.1);
+  --surface-solid: #fffdf9;
+  --surface-glass: rgba(247, 244, 238, 0.8);
+
+  --line-1: rgba(12, 40, 56, 0.14);
+  --line-2: rgba(12, 40, 56, 0.24);
+  --line-strong: rgba(12, 40, 56, 0.45);
+
+  --text-0: #0a1c26;
+  --text-1: #3d5768;
+  --text-2: #61798a;
+  --text-3: #8b9dab;
+
+  --accent: #0a7286;
+  --accent-soft: rgba(10, 114, 134, 0.1);
+  --accent-line: rgba(10, 114, 134, 0.34);
+  --accent-ink: #ffffff;
+
+  --lure: #a35a06;
+  --lure-soft: rgba(163, 90, 6, 0.1);
+  --lure-line: rgba(163, 90, 6, 0.3);
+
+  --danger: #b3261e;
+  --danger-soft: rgba(179, 38, 30, 0.09);
+  --ok: #1a7f4b;
+
+  --shadow-1: 0 1px 2px rgba(20, 40, 55, 0.07);
+  --shadow-2: 0 6px 22px -10px rgba(20, 40, 55, 0.22);
+  --shadow-3: 0 24px 60px -20px rgba(20, 40, 55, 0.3);
+  --shadow-glow: 0 0 28px -8px rgba(10, 114, 134, 0.25);
+
+  --water-top: #bfe4ee;
+  --water-mid: #dcecf0;
+  --water-deep: #f7f4ee;
+  --ray-opacity: 0.16;
+  --snow-opacity: 0.3;
+  --grid-line: rgba(12, 40, 56, 0.08);
+}
+
+/* Respect the OS preference on first visit; the toggle overrides afterwards. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --d-fast: 1ms;
+    --d-base: 1ms;
+    --d-slow: 1ms;
+    --d-reveal: 1ms;
+  }
+}

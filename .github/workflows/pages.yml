@@ -1,0 +1,60 @@
+# Build the static site and publish it to GitHub Pages.
+#
+# There is no dependency install step, because the project has no dependencies:
+# the build runs the same `node scripts/build-static.mjs` a developer runs, and
+# that script imports nothing outside this repository. Node 24 is required for
+# the build because the catalogue module graph reaches node:sqlite through the
+# database layer's imports — the physics module itself has no Node APIs at all.
+#
+# The site is built from SOURCE on every push rather than committing dist/,
+# so the published artifact can never drift from the code that produced it.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # No `npm ci` — there is no lockfile and no node_modules to install.
+      - name: Build the static site
+        run: node --disable-warning=ExperimentalWarning scripts/build-static.mjs
+
+      - name: Verify the build produced a working site
+        run: node --disable-warning=ExperimentalWarning scripts/test-static.mjs
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

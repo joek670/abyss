@@ -1,0 +1,13 @@
+# Keep the image to just what the server reads.
+node_modules
+data
+shots
+*.log
+
+# Development and version-control noise.
+.git
+.gitignore
+.dockerignore
+Dockerfile
+**/.DS_Store
+**/Thumbs.db

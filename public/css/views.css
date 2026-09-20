@@ -1,0 +1,888 @@
+/* ============================================================================
+   views.css — page composition.
+
+   The three signature pieces of this interface live here: the hero at the
+   surface, the scroll-driven descent through the zones, and the dive console.
+   ========================================================================= */
+
+/* ============================================================================
+   Hero
+   ========================================================================= */
+
+.hero {
+  position: relative;
+  min-height: calc(100dvh - var(--topbar-h) - var(--strip-h));
+  display: grid;
+  align-content: center;
+  gap: var(--s-4);
+  padding: var(--s-7) var(--gutter) var(--s-8);
+  max-width: var(--page-max);
+  margin-inline: auto;
+}
+
+.hero__eyebrow { margin-bottom: var(--s-1); }
+
+.hero__title {
+  font-family: var(--font-display);
+  font-size: var(--t-6);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  font-weight: 400;
+  margin-block: var(--s-1) var(--s-2);
+  max-width: 20ch;
+  background: linear-gradient(
+    175deg,
+    var(--text-0) 0%,
+    color-mix(in oklab, var(--text-0) 70%, var(--accent)) 62%,
+    var(--accent) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero__title em {
+  font-style: italic;
+  color: color-mix(in oklab, var(--accent) 80%, var(--text-0));
+  -webkit-text-fill-color: currentColor;
+}
+
+.hero__lede {
+  font-size: var(--t-0);
+  line-height: var(--lh-snug);
+  color: var(--text-1);
+  max-width: 64ch;
+}
+
+.hero__actions { display: flex; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-2); }
+
+/* The headline numbers under the hero. */
+.hero__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: var(--s-4) var(--s-5);
+  margin-top: var(--s-5);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line-1);
+}
+
+/* Scroll cue */
+.hero__cue {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--t--2);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.hero__cue-bar {
+  position: relative;
+  width: 1px;
+  height: 42px;
+  background: var(--line-2);
+  overflow: hidden;
+}
+.hero__cue-bar::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  height: 14px;
+  background: var(--accent);
+  animation: cue-fall 2.2s var(--ease-in-out) infinite;
+}
+@keyframes cue-fall {
+  0% { top: -14px; opacity: 0; }
+  30% { opacity: 1; }
+  100% { top: 42px; opacity: 0; }
+}
+
+/* ── Light extinction strip ───────────────────────────────────────────── */
+
+.bands { display: grid; gap: var(--s-3); }
+.band {
+  display: grid;
+  grid-template-columns: 74px 1fr 88px;
+  align-items: center;
+  gap: var(--s-3);
+  font-size: var(--t--2);
+}
+.band__name { color: var(--text-2); letter-spacing: var(--tr-wide); text-transform: uppercase; }
+.band__track {
+  position: relative;
+  height: 22px;
+  border-radius: var(--r-1);
+  background: var(--surface-1);
+  border: 1px solid var(--line-1);
+  overflow: hidden;
+}
+.band__fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--band-color), color-mix(in oklab, var(--band-color) 30%, transparent));
+  transition: transform var(--d-slow) var(--ease-out);
+}
+.band__pct {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-1);
+}
+
+/* ============================================================================
+   Descent — scroll-driven zone narrative
+   ========================================================================= */
+
+.descent { position: relative; }
+
+.zone-block {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  align-content: center;
+  gap: var(--s-6);
+  padding: var(--s-9) var(--gutter);
+  max-width: var(--page-max);
+  margin-inline: auto;
+  scroll-margin-top: var(--topbar-h);
+}
+
+.zone-block__head { max-width: 72ch; }
+
+.zone-block__index {
+  font-family: var(--font-mono);
+  font-size: var(--t--2);
+  letter-spacing: var(--tr-wider);
+  color: var(--zone-accent, var(--accent));
+}
+
+.zone-block__name {
+  font-family: var(--font-display);
+  font-size: var(--t-4);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-tight);
+  font-weight: 400;
+  margin-block: var(--s-2) var(--s-1);
+}
+.zone-block__alias {
+  font-size: var(--t-1);
+  font-style: italic;
+  color: var(--zone-accent, var(--accent));
+  margin-bottom: var(--s-4);
+}
+.zone-block__summary {
+  font-size: var(--t-0);
+  color: var(--text-1);
+  max-width: 62ch;
+}
+
+/* Live readings for the zone boundary */
+.zone-block__readings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: var(--s-4);
+  padding: var(--s-5) 0;
+  border-block: 1px solid var(--line-1);
+}
+
+/* Featured species strip inside a zone */
+.zone-block__fauna {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+  gap: var(--s-4);
+}
+
+/* ============================================================================
+   Atlas
+   ========================================================================= */
+
+.atlas__toolbar {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) 0;
+  margin-bottom: var(--s-5);
+  background: linear-gradient(180deg, var(--bg-0) 62%, transparent);
+}
+.atlas__search { position: relative; flex: 1; min-width: 210px; max-width: 380px; }
+.atlas__search svg {
+  position: absolute;
+  left: var(--s-3);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 17px;
+  height: 17px;
+  color: var(--text-3);
+  pointer-events: none;
+}
+.atlas__search .input { padding-left: calc(var(--s-3) * 2 + 17px); }
+
+.atlas__filters { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+
+.atlas__count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--t--2);
+  color: var(--text-3);
+  letter-spacing: var(--tr-wide);
+}
+
+.atlas__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  gap: var(--s-4);
+}
+
+/* ── Specimen card ────────────────────────────────────────────────────── */
+
+.specimen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  width: 100%;
+  background: var(--surface-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-4);
+  transition:
+    border-color var(--d-base) var(--ease-out),
+    background var(--d-base) var(--ease-out),
+    transform var(--d-base) var(--ease-out),
+    box-shadow var(--d-base) var(--ease-out);
+}
+.specimen:hover {
+  border-color: color-mix(in oklab, var(--specimen-accent, var(--accent)) 55%, transparent);
+  background: var(--surface-2);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-2);
+}
+
+.specimen__art {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse 70% 90% at 50% 118%,
+      color-mix(in oklab, var(--specimen-accent, var(--accent)) 22%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border-bottom: 1px solid var(--line-1);
+}
+.specimen__art svg {
+  width: 74%;
+  height: 74%;
+  color: color-mix(in oklab, var(--specimen-accent, var(--accent)) 82%, var(--text-0));
+  filter: drop-shadow(0 0 18px color-mix(in oklab, var(--specimen-accent, var(--accent)) 40%, transparent));
+  transition: transform var(--d-slow) var(--ease-out);
+}
+.specimen:hover .specimen__art svg { transform: scale(1.06) translateY(-2px); }
+
+.specimen__glow {
+  position: absolute;
+  top: 12%;
+  right: 14%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lure);
+  box-shadow: 0 0 12px 3px var(--lure);
+  animation: biolum 3.4s var(--ease-in-out) infinite;
+}
+@keyframes biolum {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  45% { opacity: 1; transform: scale(1.15); }
+}
+
+/* ── Species photography ──────────────────────────────────────────────
+   A photograph occupies the same slot as the drawn plate, so a mixed grid
+   keeps its rhythm. The credit is overlaid on a scrim rather than placed
+   below: it must stay visible (CC BY and CC BY-SA make naming the creator a
+   condition of use) but a caption line under thirty-six cards would wreck the
+   grid. The scrim guarantees contrast over any photograph, which is why the
+   text colour below is a literal white rather than a theme token — it sits on
+   a dark gradient in both themes, never on the page background. */
+
+.specimen__photo {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border-bottom: 1px solid var(--line-1);
+}
+.specimen__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--d-slow) var(--ease-out);
+}
+.specimen:hover .specimen__photo img { transform: scale(1.045); }
+
+.specimen__photo .credit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 18px var(--s-3) 5px;
+  font-size: 9.5px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.82));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Detail plate ─────────────────────────────────────────────────── */
+
+.taxon__photo {
+  margin: 0 0 var(--s-6);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-4);
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+}
+.taxon__photo img {
+  width: 100%;
+  /* `contain`, not `cover`. The plate is very wide, so a centre crop discards
+     most of a portrait-orientation photo and can cut an off-centre subject out
+     entirely — the dumbo octopus sits on the right of a mostly-black frame and
+     disappeared under `cover`. A detail view should show the whole animal. */
+  height: clamp(240px, 42vh, 460px);
+  object-fit: contain;
+  background: var(--bg-1);
+}
+
+/* The full attribution record: creator, licence deed, source file page. */
+.credit--full {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--line-1);
+  background: var(--surface-1);
+  font-size: var(--t--2);
+  color: var(--text-2);
+}
+.credit--full a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.credit--full a:hover { text-decoration-thickness: 2px; }
+.credit--full .dim { color: var(--text-3); }
+
+/* In the drawer the plate bleeds to the panel edges, matching .taxon__art. */
+.drawer .taxon__photo {
+  margin: calc(var(--s-7) * -1) calc(var(--s-6) * -1) var(--s-6);
+  border: none;
+  border-bottom: 1px solid var(--line-1);
+  border-radius: 0;
+}
+.drawer .taxon__photo img { height: clamp(200px, 28vh, 300px); }
+
+.specimen__body { padding: 0 var(--s-4) var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); flex: 1; }
+.specimen__name { font-size: var(--t-0); font-weight: 600; line-height: var(--lh-snug); }
+.specimen__sci {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--t--1);
+  color: var(--text-2);
+}
+.specimen__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin-top: auto;
+  padding-top: var(--s-2);
+}
+.specimen__depth {
+  font-family: var(--font-mono);
+  font-size: var(--t--2);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Depth bar shown on each card, spanning the full 0-11 000 m so the cards are
+   comparable to one another at a glance. */
+.depthbar {
+  position: relative;
+  height: 3px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  margin-top: var(--s-1);
+}
+.depthbar__span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--r-full);
+  background: var(--specimen-accent, var(--accent));
+  min-width: 3px;
+}
+
+/* ============================================================================
+   Species detail (drawer + full page)
+   ========================================================================= */
+
+/* Specimen plate. On a full page it is a bounded panel — the negative margin
+   that bleeds it to the drawer's edges is applied only inside the drawer,
+   otherwise it would ride up over the breadcrumb. */
+.taxon__art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: clamp(200px, 30vh, 300px);
+  margin-bottom: var(--s-6);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-4);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 90% at 50% 118%, color-mix(in oklab, var(--spec-accent, var(--accent)) 26%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--bg-2), var(--bg-1));
+}
+.taxon__art svg {
+  width: auto;
+  height: 78%;
+  max-width: 62%;
+  color: color-mix(in oklab, var(--spec-accent, var(--accent)) 85%, var(--text-0));
+  filter: drop-shadow(0 0 26px color-mix(in oklab, var(--spec-accent, var(--accent)) 45%, transparent));
+}
+
+/* In the drawer the plate bleeds to the panel's edges. */
+.drawer .taxon__art {
+  margin: calc(var(--s-7) * -1) calc(var(--s-6) * -1) var(--s-6);
+  height: clamp(190px, 26vh, 260px);
+  border: none;
+  border-bottom: 1px solid var(--line-1);
+  border-radius: 0;
+}
+
+.taxon__names { margin-bottom: var(--s-5); }
+.taxon__common {
+  font-family: var(--font-display);
+  font-size: var(--t-3);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-tight);
+  font-weight: 400;
+}
+.taxon__sci {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--t-1);
+  color: var(--text-2);
+  margin-top: var(--s-1);
+}
+
+.taxon__facts {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-5);
+}
+.fact {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: var(--s-3);
+  align-items: start;
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  font-size: var(--t--1);
+  line-height: var(--lh-snug);
+  color: var(--text-1);
+}
+.fact__n {
+  font-family: var(--font-mono);
+  font-size: var(--t--2);
+  color: var(--accent);
+  padding-top: 2px;
+}
+
+.speclist { display: grid; gap: 0; }
+.speclist__row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--line-1);
+  font-size: var(--t--1);
+}
+.speclist__row:last-child { border-bottom: none; }
+.speclist__key {
+  font-size: var(--t--2);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding-top: 2px;
+}
+.speclist__val { color: var(--text-0); }
+
+.related { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-3); }
+.related__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3);
+  background: var(--surface-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  font-size: var(--t--2);
+  transition: all var(--d-fast) linear;
+  text-align: left;
+}
+.related__item:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.related__item b { font-size: var(--t--1); font-weight: 600; color: var(--text-0); }
+
+/* ============================================================================
+   Dive console
+   ========================================================================= */
+
+.console {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: start;
+}
+
+.console__controls { display: grid; gap: var(--s-5); position: sticky; top: calc(var(--topbar-h) + var(--s-5)); }
+
+.depth-input {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  font-family: var(--font-mono);
+}
+.depth-input input {
+  /* `flex: 1` + `min-width: 0`, NOT `width: 100%`. As a flex item, a 100% width
+     resolves against the container and then the sibling unit suffix and the gap
+     are added on top, overflowing the panel by ~27px and clipping the "m". */
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  background: none;
+  border: none;
+  border-bottom: 2px solid var(--line-2);
+  padding: var(--s-1) 0;
+  font-size: var(--t-4);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tr-tight);
+  color: var(--text-0);
+  transition: border-color var(--d-fast) linear;
+}
+.depth-input input:focus { outline: none; border-color: var(--accent); }
+.depth-input span { font-size: var(--t-2); color: var(--text-3); }
+
+.presets { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+
+.console__stage { display: grid; gap: var(--s-5); }
+
+.gauges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: var(--s-4);
+}
+
+.chart-wrap { position: relative; }
+.chart-wrap canvas { width: 100%; height: 260px; display: block; }
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-5);
+  border-top: 1px solid var(--line-1);
+  font-size: var(--t--2);
+}
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.chart-legend i { width: 12px; height: 2px; border-radius: 2px; background: currentColor; }
+
+/* Equivalence list — the "what does this pressure mean" panel */
+.equiv { display: grid; gap: 0; }
+.equiv__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--line-1);
+}
+.equiv__row:last-child { border-bottom: none; }
+.equiv__label { font-size: var(--t--1); color: var(--text-1); }
+.equiv__value {
+  font-family: var(--font-mono);
+  font-size: var(--t-0);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* Live stream readout */
+.live {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: var(--s-4);
+}
+.live__cell { display: grid; gap: 2px; }
+.live__k {
+  font-size: 9.5px;
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.live__v {
+  font-family: var(--font-mono);
+  font-size: var(--t-1);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-0);
+}
+
+/* Mission clock + progress */
+.mission { display: grid; gap: var(--s-3); }
+.mission__bar {
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  overflow: hidden;
+  position: relative;
+}
+.mission__fill {
+  height: 100%;
+  width: 0;
+  border-radius: var(--r-full);
+  background: linear-gradient(90deg, var(--accent), var(--lure));
+  transition: width 120ms linear;
+}
+.mission__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-4);
+  font-family: var(--font-mono);
+  font-size: var(--t--2);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Landmark ladder */
+.ladder { position: relative; display: grid; gap: 0; }
+.ladder__row {
+  display: grid;
+  grid-template-columns: 78px 1fr auto;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line-1);
+  font-size: var(--t--1);
+  transition: background var(--d-fast) linear, color var(--d-fast) linear;
+}
+.ladder__row:last-child { border-bottom: none; }
+.ladder__row.is-passed { color: var(--text-3); }
+.ladder__row.is-passed .ladder__name { color: var(--text-3); }
+.ladder__row.is-current {
+  background: var(--accent-soft);
+  border-radius: var(--r-2);
+  padding-inline: var(--s-3);
+  margin-inline: calc(var(--s-3) * -1);
+}
+.ladder__row.is-current .ladder__name { color: var(--accent); font-weight: 600; }
+.ladder__d { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-2); }
+.ladder__name { color: var(--text-1); }
+.ladder__note { font-size: var(--t--2); color: var(--text-3); text-align: right; }
+
+/* ============================================================================
+   Dive log
+   ========================================================================= */
+
+.logstats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--s-5);
+  padding: var(--s-5);
+  background: var(--surface-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-4);
+}
+
+.loglist { display: grid; gap: var(--s-3); }
+
+.logentry {
+  display: grid;
+  grid-template-columns: 4px 1fr auto;
+  gap: var(--s-5);
+  align-items: center;
+  padding: var(--s-4) var(--s-5);
+  background: var(--surface-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  transition: all var(--d-base) var(--ease-out);
+}
+.logentry:hover { border-color: var(--line-2); background: var(--surface-2); }
+.logentry__bar { align-self: stretch; border-radius: var(--r-full); background: var(--entry-accent, var(--accent)); opacity: 0.8; }
+.logentry__main { min-width: 0; }
+.logentry__label { font-weight: 600; font-size: var(--t-0); }
+.logentry__notes {
+  font-size: var(--t--2);
+  color: var(--text-2);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logentry__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  margin-top: var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--t--2);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.logentry__depth {
+  font-family: var(--font-mono);
+  font-size: var(--t-2);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-0);
+  text-align: right;
+  white-space: nowrap;
+}
+.logentry__depth small { font-size: 0.5em; color: var(--text-3); font-weight: 400; margin-left: 2px; }
+
+/* ============================================================================
+   Prose (Method page)
+   ========================================================================= */
+
+.prose { max-width: var(--measure); }
+.prose h2 {
+  font-family: var(--font-display);
+  font-size: var(--t-3);
+  font-weight: 400;
+  letter-spacing: var(--tr-tight);
+  line-height: var(--lh-snug);
+  margin-top: var(--s-8);
+  margin-bottom: var(--s-4);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line-1);
+}
+.prose h3 {
+  font-size: var(--t-1);
+  font-weight: 600;
+  margin-top: var(--s-6);
+  margin-bottom: var(--s-2);
+}
+.prose p { margin-bottom: var(--s-4); color: var(--text-1); }
+.prose ul { margin-bottom: var(--s-4); display: grid; gap: var(--s-2); }
+.prose li {
+  position: relative;
+  padding-left: var(--s-5);
+  color: var(--text-1);
+}
+.prose li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.65em;
+  width: 10px;
+  height: 1px;
+  background: var(--accent);
+}
+.prose strong { color: var(--text-0); font-weight: 600; }
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border-radius: var(--r-1);
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
+  color: var(--accent);
+}
+.prose a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.prose a:hover { text-decoration-thickness: 2px; }
+
+.equation {
+  margin: var(--s-5) 0;
+  padding: var(--s-4) var(--s-5);
+  background: var(--surface-1);
+  border: 1px solid var(--line-1);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r-2);
+  font-family: var(--font-mono);
+  font-size: var(--t--1);
+  line-height: var(--lh-loose);
+  color: var(--text-0);
+  overflow-x: auto;
+  white-space: pre;
+}
+.equation em { color: var(--text-3); font-style: normal; }
+
+/* Architecture diagram on the Method page */
+.arch { display: grid; gap: var(--s-4); }
+.arch__row {
+  display: grid;
+  grid-template-columns: 128px 1fr;
+  gap: var(--s-4);
+  align-items: start;
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--line-1);
+}
+.arch__row:last-child { border-bottom: none; }
+.arch__layer {
+  font-family: var(--font-mono);
+  font-size: var(--t--2);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--accent);
+  padding-top: 3px;
+}
+.arch__items { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+
+/* ============================================================================
+   Responsive
+   ========================================================================= */
+
+@media (max-width: 1080px) {
+  .console { grid-template-columns: 1fr; }
+  .console__controls { position: static; }
+}
+
+@media (max-width: 720px) {
+  .band { grid-template-columns: 60px 1fr 64px; }
+  .speclist__row { grid-template-columns: 1fr; gap: var(--s-1); }
+  .ladder__row { grid-template-columns: 62px 1fr; }
+  .ladder__note { display: none; }
+  .logentry { grid-template-columns: 3px 1fr; }
+  .logentry__depth { grid-column: 2; text-align: left; }
+  .arch__row { grid-template-columns: 1fr; gap: var(--s-2); }
+  .atlas__count { margin-left: 0; width: 100%; }
+}
+
+/* ============================================================================
+   Reduced motion
+   ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__cue-bar::after,
+  .specimen__glow,
+  .strip__dot { animation: none; }
+  .specimen:hover { transform: none; }
+  .specimen:hover .specimen__art svg { transform: none; }
+  .js .reveal { opacity: 1; transform: none; }
+}

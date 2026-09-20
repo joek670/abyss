@@ -1,0 +1,622 @@
+/* ============================================================================
+   base.css — reset, typography, and the application shell.
+
+   Layout model: four fixed regions (water field, topbar, depth rail,
+   instrument strip) with one scrolling region between them. The rail and the
+   strip are `position: fixed` rather than grid tracks so that the page can
+   scroll at 60 fps without the browser reflowing them, and so that a long
+   atlas listing never pushes the readout off screen.
+   ========================================================================= */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+* { margin: 0; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-family: var(--font-sans);
+  font-size: var(--t-0);
+  line-height: var(--lh-body);
+  letter-spacing: var(--tr-normal);
+  font-synthesis-weight: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  transition: background var(--d-slow) var(--ease-out), color var(--d-slow) var(--ease-out);
+}
+
+img, svg, canvas, video { display: block; max-width: 100%; }
+svg { flex: none; }
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+button { background: none; border: none; cursor: pointer; }
+
+a { color: inherit; text-decoration: none; }
+
+ul, ol { list-style: none; padding: 0; }
+
+hr {
+  border: none;
+  border-top: 1px solid var(--line-1);
+  margin: var(--s-6) 0;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--r-1);
+}
+
+.skip-link {
+  position: fixed;
+  top: var(--s-3);
+  left: var(--s-3);
+  z-index: 999;
+  padding: var(--s-3) var(--s-4);
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: var(--r-2);
+  font-weight: 600;
+  transform: translateY(-200%);
+  transition: transform var(--d-fast) var(--ease-out);
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* ── Scrollbar ────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: var(--r-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background-clip: content-box; background-color: var(--line-strong); }
+
+/* ============================================================================
+   Water field — the fixed background
+   ========================================================================= */
+
+.water {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-water);
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      180deg,
+      var(--water-top) 0%,
+      var(--water-mid) 22%,
+      var(--water-deep) 62%,
+      var(--bg-void) 100%
+    );
+  transition: background var(--d-slow) linear;
+}
+
+/* The gradient is driven by scroll depth via --depth-progress (0..1), set on
+   <html> by the scroll observer. */
+.water__glow {
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 75vh;
+  background: radial-gradient(
+    ellipse 70% 55% at 50% 0%,
+    color-mix(in oklab, var(--water-top) 85%, white 15%) 0%,
+    transparent 68%
+  );
+  opacity: calc(0.9 - var(--depth-progress, 0) * 0.92);
+  transition: opacity var(--d-slow) linear;
+  filter: blur(8px);
+}
+
+/* God rays through the surface. Pure CSS, and they fade out entirely by the
+   time the reader has descended past the photic zone. */
+.water__rays {
+  position: absolute;
+  inset: -30% -20% auto -20%;
+  height: 130vh;
+  opacity: calc(var(--ray-opacity) * (1 - var(--depth-progress, 0) * 1.6));
+  background: repeating-linear-gradient(
+    99deg,
+    transparent 0 44px,
+    color-mix(in oklab, var(--water-top) 60%, white 40%) 44px 52px,
+    transparent 52px 128px
+  );
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85) 0%, transparent 78%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85) 0%, transparent 78%);
+  filter: blur(14px);
+  animation: rays-drift 26s var(--ease-in-out) infinite alternate;
+  transition: opacity var(--d-slow) linear;
+}
+
+@keyframes rays-drift {
+  from { transform: translate3d(-2%, 0, 0) skewX(0deg); }
+  to   { transform: translate3d(2%, 0, 0) skewX(1.4deg); }
+}
+
+#marine-snow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: var(--snow-opacity);
+}
+
+/* ============================================================================
+   Topbar
+   ========================================================================= */
+
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--topbar-h);
+  z-index: var(--z-topbar);
+  background: var(--surface-glass);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.topbar__inner {
+  height: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+}
+
+.topbar__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  overflow: hidden;
+}
+.topbar__progress span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--lure));
+  opacity: 0;
+  transition: width var(--d-base) var(--ease-out), opacity var(--d-fast) linear;
+}
+.topbar__progress span.is-active { opacity: 1; }
+
+/* ── Brand ────────────────────────────────────────────────────────────── */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex: none;
+}
+.brand__mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-2);
+  background: var(--accent-soft);
+}
+.brand__mark svg { width: 20px; height: 20px; }
+.brand__text { display: flex; flex-direction: column; line-height: 1.1; }
+.brand__name {
+  font-family: var(--font-mono);
+  font-size: var(--t-1);
+  font-weight: 600;
+  letter-spacing: var(--tr-wider);
+}
+.brand__sub {
+  font-size: var(--t--2);
+  color: var(--text-2);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+}
+
+/* ── Nav ──────────────────────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  margin-inline-start: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav::-webkit-scrollbar { display: none; }
+
+.nav a {
+  position: relative;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-2);
+  font-size: var(--t--1);
+  font-weight: 500;
+  color: var(--text-1);
+  white-space: nowrap;
+  transition: color var(--d-fast) linear, background var(--d-fast) linear;
+}
+.nav a:hover { color: var(--text-0); background: var(--surface-2); }
+.nav a[aria-current="page"] { color: var(--accent); }
+.nav a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: var(--s-3);
+  right: var(--s-3);
+  bottom: 2px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.topbar__actions { display: flex; align-items: center; gap: var(--s-2); flex: none; }
+
+/* ============================================================================
+   Depth rail
+   ========================================================================= */
+
+.rail {
+  position: fixed;
+  top: var(--topbar-h);
+  bottom: var(--strip-h);
+  left: 0;
+  width: var(--rail-w);
+  z-index: var(--z-rail);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-5) 0 var(--s-4);
+  border-right: 1px solid var(--line-1);
+  background: linear-gradient(90deg, var(--surface-glass), transparent);
+}
+
+.rail__label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: var(--tr-wider);
+  color: var(--text-3);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.rail__scale {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.rail__track {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    180deg,
+    var(--line-2),
+    var(--line-1) 55%,
+    transparent 100%
+  );
+}
+
+/* Zone bands: each zone gets a proportional slice of the track, tinted with
+   its own accent so the rail doubles as a legend.
+   The accents darken steeply with depth (hadal is #0b2a3d), which would make
+   the deep bands invisible on a near-black background. Each band is therefore
+   lifted toward a legible mid-tone while keeping its hue, so all five read as
+   distinct at a glance without losing the sense that the water gets darker. */
+.rail__zones { position: absolute; inset: 0; }
+
+.rail__zone {
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  transform: translateX(-50%);
+  border-radius: var(--r-full);
+  background: color-mix(in oklab, var(--zone-accent) 58%, var(--text-2));
+  opacity: 0.55;
+  transition:
+    opacity var(--d-base) var(--ease-out),
+    width var(--d-base) var(--ease-out),
+    box-shadow var(--d-base) var(--ease-out);
+}
+.rail__zone.is-active {
+  opacity: 1;
+  width: 10px;
+  background: var(--zone-accent);
+  box-shadow: 0 0 14px -1px color-mix(in oklab, var(--zone-accent) 70%, transparent);
+}
+
+.rail__marker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  transform: translateY(-50%);
+  transition: top var(--d-base) var(--ease-out);
+  will-change: top;
+}
+
+.rail__marker-line {
+  flex: none;
+  margin-left: auto;
+  margin-right: calc(50% - 7px);
+  width: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.rail__marker-value {
+  position: absolute;
+  left: calc(50% + 14px);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  white-space: nowrap;
+  background: var(--surface-glass);
+  padding: 1px 5px;
+  border-radius: var(--r-1);
+  backdrop-filter: blur(6px);
+}
+
+.rail__foot {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--text-3);
+  text-align: center;
+  line-height: 1.3;
+  max-width: 100%;
+  padding-inline: 4px;
+  overflow-wrap: anywhere;
+}
+
+/* ============================================================================
+   Main scroll region
+   ========================================================================= */
+
+.main {
+  position: relative;
+  z-index: var(--z-content);
+  margin-left: var(--rail-w);
+  padding-top: var(--topbar-h);
+  padding-bottom: var(--strip-h);
+  min-height: 100dvh;
+}
+.main:focus { outline: none; }
+
+.view { min-height: calc(100dvh - var(--topbar-h) - var(--strip-h)); }
+
+/* ── Page container ───────────────────────────────────────────────────── */
+.page {
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding: var(--s-7) var(--gutter) var(--s-9);
+}
+
+.page--wide { max-width: 1560px; }
+
+/* ── Boot state ───────────────────────────────────────────────────────── */
+.boot {
+  display: grid;
+  place-items: center;
+  gap: var(--s-5);
+  min-height: 60vh;
+  color: var(--text-2);
+}
+.boot__ring {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--accent);
+  animation: spin 900ms linear infinite;
+}
+.boot__text {
+  font-family: var(--font-mono);
+  font-size: var(--t--1);
+  letter-spacing: var(--tr-wide);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================================
+   Instrument strip
+   ========================================================================= */
+
+.strip {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--strip-h);
+  z-index: var(--z-strip);
+  background: var(--surface-glass);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border-top: 1px solid var(--line-1);
+}
+
+.strip__inner {
+  height: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+}
+
+.strip__lead {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex: none;
+  padding-right: var(--s-5);
+  border-right: 1px solid var(--line-1);
+  height: 60%;
+}
+
+.strip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 var(--accent-line);
+  animation: pulse 2.4s var(--ease-in-out) infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-line); }
+  50% { box-shadow: 0 0 0 7px transparent; }
+}
+
+.strip__depth {
+  font-family: var(--font-mono);
+  font-size: var(--t-2);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tr-tight);
+  color: var(--text-0);
+  line-height: 1;
+}
+.strip__depth small {
+  font-size: 0.5em;
+  color: var(--text-2);
+  margin-left: 2px;
+  font-weight: 400;
+}
+.strip__zone {
+  font-size: var(--t--2);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.strip__grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(84px, 1fr);
+  gap: var(--s-2) var(--s-5);
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.strip__grid::-webkit-scrollbar { display: none; }
+
+.readout { min-width: 0; }
+.readout dt {
+  font-size: 9.5px;
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.readout dd {
+  font-family: var(--font-mono);
+  font-size: var(--t--1);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-0);
+  white-space: nowrap;
+  transition: color var(--d-fast) linear;
+}
+.readout dd.is-flash { color: var(--accent); }
+
+.strip__tail { flex: none; }
+
+/* ============================================================================
+   Responsive
+   ========================================================================= */
+
+@media (max-width: 1180px) {
+  :root { --rail-w: 76px; }
+  .brand__sub { display: none; }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --rail-w: 0px;
+    --strip-h: 96px;
+  }
+  .rail { display: none; }
+  .main { margin-left: 0; }
+
+  .strip__inner {
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-4);
+    padding-block: var(--s-2);
+    align-content: center;
+  }
+  .strip__lead {
+    border-right: none;
+    padding-right: 0;
+    height: auto;
+    width: 100%;
+    gap: var(--s-2);
+  }
+  .strip__depth { font-size: var(--t-1); }
+  .strip__grid {
+    grid-auto-columns: minmax(70px, auto);
+    gap: var(--s-2) var(--s-4);
+  }
+  .strip__tail { display: none; }
+}
+
+@media (max-width: 640px) {
+  :root { --topbar-h: 56px; }
+  .nav { gap: 0; }
+  .nav a { padding: var(--s-2); font-size: var(--t--2); }
+  .brand__text { display: none; }
+  .iconbtn__hint { display: none; }
+  .strip__grid { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ── Print ────────────────────────────────────────────────────────────── */
+@media print {
+  .water, .rail, .strip, .topbar, .palette, .drawer, .toasts { display: none !important; }
+  .main { margin: 0; padding: 0; }
+  body { background: #fff; color: #000; }
+}

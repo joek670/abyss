@@ -1,0 +1,26 @@
+# Ignore generated and local-only files.
+#
+# `/data/` is ANCHORED to the repository root on purpose. An unanchored `data/`
+# matches a directory of that name at ANY depth — including `server/data/`,
+# which holds the species catalogue, the image manifest and the pins file. That
+# silently produced a repository with no data in it, and the CI build would have
+# failed on a checkout that looked complete.
+node_modules/
+/data/
+/shots/
+*.log
+
+# The static build output. It is built from source in CI on every push, so
+# committing it would only create a second copy that can drift from the code
+# that produced it.
+/dist/
+
+# A working note about this project written outside this repository, and stale
+# (it predates the photography work). Not part of the deliverable, so it stays
+# on disk and out of the published source.
+muse-ad-brief.md
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
