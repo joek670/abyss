@@ -366,7 +366,7 @@ button.chip[aria-pressed="true"] {
   line-height: 1.1;
   color: var(--text-0);
 }
-.stat__value small { font-size: 0.45em; color: var(--text-2); font-weight: 400; margin-left: 3px; }
+.stat__value small { font-size: max(0.45em, 11px); color: var(--text-2); font-weight: 400; margin-left: 3px; }
 .stat__label {
   font-size: var(--t--2);
   letter-spacing: var(--tr-wide);
