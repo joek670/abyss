@@ -313,19 +313,23 @@ export const aboutView = {
         'div.panel',
         { style: { marginTop: 'var(--s-5)' } },
         h(
-          'table.table',
+          'div.table-wrap',
           null,
-          h('thead', null, h('tr', null, h('th', null, 'Method'), h('th', null, 'Path'), h('th', null, 'Purpose'))),
           h(
-            'tbody',
+            'table.table',
             null,
-            ...endpoints.map(([method, path, purpose]) =>
-              h(
-                'tr',
-                null,
-                h('td', null, h('span.badge', null, method)),
-                h('td', null, h('code', null, path)),
-                h('td.muted', null, purpose),
+            h('thead', null, h('tr', null, h('th', null, 'Method'), h('th', null, 'Path'), h('th', null, 'Purpose'))),
+            h(
+              'tbody',
+              null,
+              ...endpoints.map(([method, path, purpose]) =>
+                h(
+                  'tr',
+                  null,
+                  h('td', null, h('span.badge', null, method)),
+                  h('td', null, h('code', null, path)),
+                  h('td.muted', null, purpose),
+                ),
               ),
             ),
           ),

@@ -219,11 +219,37 @@ function setProgress(active) {
 }
 
 function syncNav(path) {
+  let active = null;
   for (const a of document.querySelectorAll('#nav a[data-route]')) {
     const routePath = a.dataset.route;
     const isActive = routePath === '/' ? path === '/' : path.startsWith(routePath);
-    if (isActive) a.setAttribute('aria-current', 'page');
-    else a.removeAttribute('aria-current');
+    if (isActive) {
+      a.setAttribute('aria-current', 'page');
+      active = a;
+    } else {
+      a.removeAttribute('aria-current');
+    }
+  }
+  // On a phone the nav is a horizontal scroller that cannot show every link.
+  // Without this the current page's own link is the one left half-cut at the
+  // edge — the page you are on is the one you cannot read.
+  if (active) scrollNavIntoView(active);
+}
+
+function scrollNavIntoView(link) {
+  const nav = link.parentElement;
+  if (!nav || nav.scrollWidth <= nav.clientWidth) return;
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  try {
+    // 'center' rather than 'nearest': nearest parks the link against the
+    // faded trailing edge, which is where it is hardest to read.
+    link.scrollIntoView({
+      behavior: reduced ? 'auto' : 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    });
+  } catch {
+    nav.scrollLeft = link.offsetLeft - nav.clientWidth / 2 + link.offsetWidth / 2;
   }
 }
 

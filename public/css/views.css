@@ -19,6 +19,10 @@
   max-width: var(--page-max);
   margin-inline: auto;
 }
+/* Grid children default to min-width:auto; the display-size title sets a
+   min-content floor wider than a small phone without this. */
+.hero > * { min-width: 0; }
+.hero__title, .hero__lede { overflow-wrap: break-word; }
 
 .hero__eyebrow { margin-bottom: var(--s-1); }
 
@@ -58,7 +62,7 @@
 /* The headline numbers under the hero. */
 .hero__facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(148px, 100%), 1fr));
   gap: var(--s-4) var(--s-5);
   margin-top: var(--s-5);
   padding-top: var(--s-5);
@@ -181,7 +185,7 @@
 /* Live readings for the zone boundary */
 .zone-block__readings {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr));
   gap: var(--s-4);
   padding: var(--s-5) 0;
   border-block: 1px solid var(--line-1);
@@ -190,7 +194,7 @@
 /* Featured species strip inside a zone */
 .zone-block__fauna {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(228px, 100%), 1fr));
   gap: var(--s-4);
 }
 
@@ -235,7 +239,7 @@
 
 .atlas__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(272px, 100%), 1fr));
   gap: var(--s-4);
 }
 
@@ -535,7 +539,7 @@
 }
 .speclist__val { color: var(--text-0); }
 
-.related { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-3); }
+.related { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: var(--s-3); }
 .related__item {
   display: flex;
   flex-direction: column;
@@ -562,7 +566,13 @@
   align-items: start;
 }
 
-.console__controls { display: grid; gap: var(--s-5); position: sticky; top: calc(var(--topbar-h) + var(--s-5)); }
+.console__controls {
+  display: grid;
+  gap: var(--s-5);
+  min-width: 0;
+  position: sticky;
+  top: calc(var(--topbar-h) + var(--s-5));
+}
 
 .depth-input {
   display: flex;
@@ -593,16 +603,24 @@
 
 .presets { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 
-.console__stage { display: grid; gap: var(--s-5); }
+.console__stage { display: grid; gap: var(--s-5); min-width: 0; }
+/* Grid children default to min-width:auto, so an unwrapped panel or a plain
+   wrapper div refuses to shrink and drags the whole column wider than the
+   phone. Applies to the direct children whatever element they are. */
+.console__stage > *,
+.console__controls > * { min-width: 0; }
 
 .gauges {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(132px, 100%), 1fr));
   gap: var(--s-4);
 }
 
-.chart-wrap { position: relative; }
-.chart-wrap canvas { width: 100%; height: 260px; display: block; }
+.chart-wrap { position: relative; min-width: 0; }
+/* A canvas is a replaced element: in min-content sizing, width:100% falls
+   back to the intrinsic width of its bitmap, which put a floor under the
+   whole console column on a narrow phone. min-width:0 releases it. */
+.chart-wrap canvas { width: 100%; min-width: 0; height: 260px; display: block; }
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
@@ -615,29 +633,43 @@
 .chart-legend i { width: 12px; height: 2px; border-radius: 2px; background: currentColor; }
 
 /* Equivalence list — the "what does this pressure mean" panel */
-.equiv { display: grid; gap: 0; }
+.equiv { display: grid; gap: 0; min-width: 0; }
 .equiv__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--s-4);
+  gap: var(--s-1) var(--s-4);
   padding: var(--s-3) 0;
   border-bottom: 1px solid var(--line-1);
+  min-width: 0;
 }
 .equiv__row:last-child { border-bottom: none; }
-.equiv__label { font-size: var(--t--1); color: var(--text-1); }
+.equiv__label {
+  font-size: var(--t--1);
+  line-height: var(--lh-snug);
+  color: var(--text-1);
+  min-width: 0;
+}
 .equiv__value {
   font-family: var(--font-mono);
   font-size: var(--t-0);
+  line-height: var(--lh-snug);
   font-variant-numeric: tabular-nums;
   color: var(--accent);
-  white-space: nowrap;
+  /* Numbers must not break mid-figure, but a prose value such as the water
+     compression line has to be allowed to wrap or it sets the row's
+     min-content width and gets clipped by .panel's overflow:hidden. */
+  overflow-wrap: break-word;
+  min-width: 0;
+  margin-left: auto;
+  text-align: right;
 }
 
 /* Live stream readout */
 .live {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(104px, 100%), 1fr));
   gap: var(--s-4);
 }
 .live__cell { display: grid; gap: 2px; }
@@ -681,10 +713,10 @@
 }
 
 /* Landmark ladder */
-.ladder { position: relative; display: grid; gap: 0; }
+.ladder { position: relative; display: grid; gap: 0; min-width: 0; }
 .ladder__row {
   display: grid;
-  grid-template-columns: 78px 1fr auto;
+  grid-template-columns: 78px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--s-4);
   padding: var(--s-2) 0;
@@ -698,13 +730,21 @@
 .ladder__row.is-current {
   background: var(--accent-soft);
   border-radius: var(--r-2);
-  padding-inline: var(--s-3);
-  margin-inline: calc(var(--s-3) * -1);
+  /* Bleed the highlight into the panel's padding WITHOUT widening the row:
+     negative margins made .ladder 24px wider than its container, and
+     .panel's overflow:hidden cut the right-hand edge off. */
+  box-shadow: 0 0 0 var(--s-3) var(--accent-soft);
 }
 .ladder__row.is-current .ladder__name { color: var(--accent); font-weight: 600; }
 .ladder__d { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-2); }
-.ladder__name { color: var(--text-1); }
-.ladder__note { font-size: var(--t--2); color: var(--text-3); text-align: right; }
+.ladder__name { color: var(--text-1); line-height: var(--lh-snug); min-width: 0; }
+.ladder__note {
+  font-size: var(--t--2);
+  line-height: var(--lh-snug);
+  color: var(--text-3);
+  text-align: right;
+  min-width: 0;
+}
 
 /* ============================================================================
    Dive log
@@ -712,7 +752,7 @@
 
 .logstats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
   gap: var(--s-5);
   padding: var(--s-5);
   background: var(--surface-1);
@@ -864,14 +904,38 @@
 }
 
 @media (max-width: 720px) {
-  .band { grid-template-columns: 60px 1fr 64px; }
+  .band { grid-template-columns: 60px minmax(0, 1fr) 64px; }
   .speclist__row { grid-template-columns: 1fr; gap: var(--s-1); }
-  .ladder__row { grid-template-columns: 62px 1fr; }
+  .ladder__row { grid-template-columns: 62px minmax(0, 1fr); gap: var(--s-3); }
   .ladder__note { display: none; }
   .logentry { grid-template-columns: 3px 1fr; }
   .logentry__depth { grid-column: 2; text-align: left; }
   .arch__row { grid-template-columns: 1fr; gap: var(--s-2); }
   .atlas__count { margin-left: 0; width: 100%; }
+}
+
+@media (max-width: 640px) {
+  /* Side-by-side call-to-action buttons do not fit a small phone; full-width
+     stacked buttons also give a larger tap target. */
+  .hero__actions { flex-direction: column; align-items: stretch; }
+  .hero__actions .btn { width: 100%; }
+
+  /* Label over value reads better than a squeezed two-column row, and gives
+     the long prose values room without clipping or a horizontal scroll. */
+  .equiv__row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-1);
+    padding: var(--s-3) 0;
+  }
+  .equiv__value { margin-left: 0; text-align: left; }
+
+  /* The equation blocks scroll horizontally; make them need to less often. */
+  .equation {
+    padding: var(--s-3) var(--s-4);
+    font-size: var(--t--2);
+    line-height: var(--lh-body);
+  }
 }
 
 /* ============================================================================
