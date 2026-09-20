@@ -26,6 +26,9 @@
 /** Standard gravity (m/s^2), ISO 80000-3. */
 export const G = 9.80665;
 
+/** Standard atmosphere (Pa), ISO 2533. */
+export const ATM_PA = 101325;
+
 /** Mean surface pressure of the atmosphere (Pa). */
 export const P_ATM = 101325;
 
@@ -40,7 +43,12 @@ export const DEEPEST_FISH = 8336;
  * ------------------------------------------------------------------ */
 
 /**
- * Globally averaged open-ocean temperature in degrees Celsius.
+ * Temperature in degrees Celsius for a warm, low-latitude open-ocean
+ * profile. This is NOT a global mean: the real global-mean sea surface is
+ * near 18 C, and the surface field spans -1.8 C at the poles to over 30 C
+ * in the tropics. The curve below is a representative synthetic profile
+ * fitted for shape, not an observational climatology (for that, see WOA
+ * or Argo).
  *
  * Three superimposed terms:
  *   - a warm surface reservoir decaying with a 300 m e-folding scale
@@ -61,7 +69,8 @@ export function temperatureAt(depthM) {
 }
 
 /**
- * Globally averaged salinity in practical salinity units (PSU).
+ * Salinity in practical salinity units (PSU) for the same representative
+ * profile. Plausible open-ocean values, synthetic rather than observed.
  * Surface enrichment from net evaporation, a shallow subsurface maximum,
  * relaxing to a near-uniform 34.65 PSU deep water mass.
  */
@@ -298,7 +307,7 @@ export const ZONES = [
     max: 200,
     accent: '#6fd8ea',
     summary:
-      'The only layer with enough light for photosynthesis. Roughly 90 % of marine life lives here, and it is where the ocean exchanges heat and gas with the atmosphere.',
+      'The only layer with enough light for photosynthesis, and so the source of nearly all the ocean\'s primary production. It is where the ocean exchanges heat and gas with the atmosphere.',
   },
   {
     id: 'mesopelagic',
@@ -308,7 +317,7 @@ export const ZONES = [
     max: 1000,
     accent: '#2f8fc4',
     summary:
-      'Sunlight is too weak for plants but bright enough for animals to be seen from below. This is the domain of counterillumination, vertical migration, and the largest daily movement of biomass on the planet.',
+      'Sunlight is too weak for plants but bright enough for animals to be seen from below. This is the domain of counterillumination and vertical migration — commonly described as the largest daily movement of biomass on the planet.',
   },
   {
     id: 'bathypelagic',
@@ -318,7 +327,7 @@ export const ZONES = [
     max: 4000,
     accent: '#1d5f8a',
     summary:
-      'No sunlight reaches here at all. Every photon is biological. Food arrives only as marine snow falling from above, so bodies are built to conserve energy rather than to chase.',
+      'No sunlight reaches here at all, and almost every photon is biological — bioluminescence, with hydrothermal and chemical sources elsewhere in the deep. Food arrives only as marine snow falling from above, so bodies are built to conserve energy rather than to chase.',
   },
   {
     id: 'abyssopelagic',
@@ -338,7 +347,7 @@ export const ZONES = [
     max: 11000,
     accent: '#0b2a3d',
     summary:
-      'Named for Hades. Found only in tectonic trenches, isolated from one another like deep-water islands. Pressure exceeds a tonne per square centimetre, yet fish still live here.',
+      'Named for Hades. Found only in tectonic trenches, isolated from one another like deep-water islands. Pressure climbs past a tonne per square centimetre toward the trench floor, yet fish still live here.',
   },
 ];
 
@@ -446,15 +455,15 @@ export function profile({ max = CHALLENGER_DEEP, step = 50 } = {}) {
 const REFERENCE_DEPTHS = [
   { depth: 40, label: 'Recreational scuba limit', note: 'PADI / NOAA recommended maximum' },
   { depth: 100, label: 'Technical scuba limit', note: 'Beyond this, trimix and staged deco' },
-  { depth: 214, label: 'Deepest scuba dive, open circuit', note: 'Ahmed Gabr, Red Sea, 2014' },
+  { depth: 214, label: 'Deepest No-Limits freedive', note: 'Herbert Nitsch, 2007' },
   { depth: 332, label: 'Deepest scuba dive ever', note: 'Ahmed Gabr, Red Sea, 2014' },
   { depth: 535, label: 'Deepest penguin dive', note: 'Emperor penguin, Ross Sea' },
   { depth: 1000, label: 'Bathypelagic boundary', note: 'Sunlight is gone in every band' },
   { depth: 1280, label: 'Deepest reptile dive', note: 'Leatherback turtle' },
   { depth: 2250, label: 'Typical sperm whale hunt', note: 'Physeter macrocephalus' },
   { depth: 2992, label: 'Deepest mammal dive', note: "Cuvier's beaked whale, 3 h 42 min" },
+  { depth: 3682, label: 'Mean ocean depth', note: 'NOAA/WHOI satellite-based estimate (2010)' },
   { depth: 3800, label: 'RMS Titanic', note: 'North Atlantic, 41.7N 49.9W' },
-  { depth: 4267, label: 'Mean ocean depth', note: 'Half the seafloor is deeper than this' },
   { depth: 6000, label: 'Hadal boundary', note: 'Trenches only below this line' },
   { depth: 8336, label: 'Deepest fish ever filmed', note: 'Snailfish, Izu-Ogasawara Trench, 2022' },
   { depth: 10935, label: 'Challenger Deep', note: 'Mariana Trench — the floor' },
@@ -492,14 +501,20 @@ export function equivalences(depthM) {
     pressurePsi: s.pressurePsi,
     kgPerCm2,
     atmospheres: s.pressureAtm,
-    elephantsPerCm2: pa / elephantPa / 10000 * 1,
+    // Elephants stacked on a single square centimetre. Cross-checks against
+    // the engine's own kg/cm2: 1150 kg/cm2 at full depth / 6000 kg = 0.19.
+    elephantsPerCm2: (pa * 1e-4) / (6000 * G),
     elephantEquivalents: pa / elephantPa,
     blueWhalesStacked: pa / whalePa,
     // Steel yields around 250 MPa; how much of that budget is spent here.
     steelYieldFraction: pa / 250e6,
     // A 10 cm diameter viewport on a submersible sees this much force.
     viewportForceNewtons: pa * Math.PI * 0.05 ** 2,
-    humanLungVolumeCompressedMl: 6000 / (1 + pa / 1.0e9 * 0),
+    // Boyle's law on a 6 L total lung capacity, against ABSOLUTE pressure
+    // (the engine's pressure is gauge, so one atmosphere is added back).
+    // This is the gas-law figure only: a real chest stops shrinking near
+    // residual volume as blood shifts into the thoracic cavity.
+    humanLungVolumeCompressedMl: 6000 * (ATM_PA / (pa + ATM_PA)),
     note: 'Comparisons are computed from the integrated hydrostatic pressure, not tabulated.',
   };
 }

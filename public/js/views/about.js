@@ -58,8 +58,12 @@ export const aboutView = {
         h('strong', null, 'UNESCO 1983 (EOS-80)'),
         ' equation of state, including the secant bulk modulus ',
         h('code', null, 'K(T, S, p)'),
-        ', so a parcel at 10,000 m is correctly reported as about 4.6 % denser than the ' +
-          'same parcel at the surface.',
+        ', so a parcel at 10,000 m is reported as about 4.6 % denser than the ' +
+          'same parcel at the surface. One caveat the sound-speed section states and ' +
+          'this one must too: EOS-80 was fitted for sea pressures up to 1,000 bar. ' +
+          'Below roughly 9,800 m — and so at Challenger Deep — the density, and the ' +
+          'pressure integrated from it, are an extrapolation beyond the fitted range ' +
+          'rather than a validated result.',
       ),
       h(
         'div.equation',
@@ -98,10 +102,11 @@ export const aboutView = {
         ' at 10,935 m. The figure of 1,086 bar that circulates widely for Challenger Deep ' +
           'is ',
         h('em', null, 'below the hydrostatic floor'),
-        ' — with seawater denser than 1,000 kg/m³ the gradient cannot be less than ' +
-          '1.0 dbar per metre, so pressure at that depth must exceed 1,093 bar. That widely ' +
-          'quoted number descends from a 1960 estimate at a shallower sounding and is ' +
-          'physically impossible. The validation harness asserts the floor explicitly.',
+        ' — the gradient is ρg⁄10⁴ dbar per metre, and even for the lightest ' +
+          'seawater under equatorial gravity that is above 1.0 dbar per metre, so ' +
+          'pressure at that depth must exceed 1,094 bar. Whatever its provenance, that ' +
+          'widely quoted number is physically impossible. The validation harness asserts ' +
+          'the floor explicitly.',
       ),
     );
 
@@ -163,8 +168,10 @@ export const aboutView = {
       h(
         'p',
         null,
-        'This is why the deep sea is blue, and why the overwhelming majority of ' +
-          'bioluminescence is blue: it is the only colour that travels.',
+        'This is why the deep sea is blue, and why so much marine bioluminescence ' +
+          'emits in the blue-green: it is the part of the spectrum that travels. The ' +
+          'exceptions are striking rather than rare — the dragonfishes of the genus ' +
+          'Malacosteus carry red photophores few other animals can see.',
       ),
     );
 

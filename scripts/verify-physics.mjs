@@ -76,14 +76,17 @@ check(
   0.01,
   ' psi',
 );
-// Hydrostatic floor: with rho > 1000 kg/m3 the gradient cannot be below
-// 1.0 dbar/m, so pressure at 10935 m must exceed 10935 dbar = 1093.5 bar.
+// Hydrostatic floor: the gradient is rho*g/1e4 dbar per metre, NOT a flat
+// 1.0 dbar/m -- at rho = 1000 kg/m3 it is only 0.98. Taking the lightest
+// seawater anyone measures (rho >= 1023 kg/m3) and the reduced gravity near
+// the equator (g >= 9.78 m/s2) gives >= 1.0005 dbar/m, so pressure at
+// 10935 m must exceed ~1094 bar however generously you round.
 // NOTE: the figure of "1086 bar" that circulates widely for Challenger Deep
 // is BELOW this floor and is therefore physically impossible; it descends
-// from a 1960 estimate at a shallower sounding depth. The engine's ~1128 bar
+// physically impossible whatever its provenance. The engine's ~1128 bar
 // is consistent with the modern in-situ measurement of ~1100-1130 bar.
 const deepest = pressureAt(CHALLENGER_DEEP);
-check('deep pressure above hydrostatic floor', deepest > 1093.5 ? 1 : 0, 1, 0, '');
+check('deep pressure above hydrostatic floor', deepest > 1094 ? 1 : 0, 1, 0, '');
 check('pressure at 10935 m (bar)', deepest, 1128, 0.02, ' bar');
 check(
   'pressure at 10935 m (psi)',
@@ -136,7 +139,7 @@ check(
 );
 
 console.log('\n── Water column shape ────────────────────────────────────────────');
-check('SST (global mean) 22-29 C', stateAt(0).temperature, 25.5, 0.14, ' C');
+check('SST (warm low-latitude profile) 22-29 C', stateAt(0).temperature, 25.5, 0.14, ' C');
 check('temperature at 1000 m 3-6 C', stateAt(1000).temperature, 3.9, 0.35, ' C');
 check('temperature at 4000 m 1-3 C', stateAt(4000).temperature, 2.0, 0.5, ' C');
 check('hadal water warmer than abyssal', stateAt(10935).temperature > stateAt(4000).temperature ? 1 : 0, 1, 0, '');
