@@ -640,12 +640,12 @@ hr {
   .iconbtn__hint { display: none; }
   /* Two rows of three readouts need room the one-line desktop strip doesn't,
      and the figures are set tighter so nothing wraps at 360px. */
-  :root { --strip-h: calc(116px + var(--strip-safe)); }
+  :root { --strip-h: calc(124px + var(--strip-safe)); }
   .strip__inner { padding-block: var(--s-2); gap: var(--s-1) var(--s-3); }
   .strip__lead { gap: var(--s-2); }
-  .strip__depth { font-size: var(--t-0); }
+  .strip__depth { font-size: var(--t-1); }
   .strip__zone {
-    font-size: 9.5px;
+    font-size: var(--t--2);
     letter-spacing: var(--tr-wide);
     min-width: 0;
     overflow: hidden;
@@ -663,8 +663,8 @@ hr {
      left-flush run of ragged figures looks like an accident at this size. */
   .strip__lead { justify-content: center; }
   .readout { text-align: center; }
-  .readout dt { font-size: 9px; }
-  .readout dd { font-size: var(--t--2); }
+  .readout dt { font-size: 10.5px; }
+  .readout dd { font-size: var(--t--1); }
 }
 
 /* ── Print ────────────────────────────────────────────────────────────── */
