@@ -389,6 +389,17 @@
   text-underline-offset: 2px;
   text-decoration-thickness: 1px;
 }
+.credit--full a {
+  position: relative;
+  display: inline-block;
+}
+/* Grow the touch target to the WCAG 2.2 AA minimum without changing how the
+   line looks: the credit links are 13-18px tall as text. */
+.credit--full a::after {
+  content: '';
+  position: absolute;
+  inset: -6px -4px;
+}
 .credit--full a:hover { text-decoration-thickness: 2px; }
 .credit--full .dim { color: var(--text-3); }
 
@@ -804,7 +815,7 @@
   text-align: right;
   white-space: nowrap;
 }
-.logentry__depth small { font-size: 0.5em; color: var(--text-3); font-weight: 400; margin-left: 2px; }
+.logentry__depth small { font-size: max(0.5em, 11px); color: var(--text-3); font-weight: 400; margin-left: 2px; }
 
 /* ============================================================================
    Prose (Method page)
