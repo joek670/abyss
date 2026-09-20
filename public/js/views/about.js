@@ -98,8 +98,9 @@ export const aboutView = {
         ' at 10,935 m. The figure of 1,086 bar that circulates widely for Challenger Deep ' +
           'is ',
         h('em', null, 'below the hydrostatic floor'),
-        ' — with seawater denser than 1,000 kg/m³ the gradient cannot be less than ' +
-          '1.0 dbar per metre, so pressure at that depth must exceed 1,093 bar. That widely ' +
+        ' — the gradient is ρg⁄10⁴ dbar per metre, and even for the lightest ' +
+          'seawater under equatorial gravity that is above 1.0 dbar per metre, so ' +
+          'pressure at that depth must exceed 1,094 bar. That widely ' +
           'quoted number descends from a 1960 estimate at a shallower sounding and is ' +
           'physically impossible. The validation harness asserts the floor explicitly.',
       ),

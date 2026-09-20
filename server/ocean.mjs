@@ -338,7 +338,7 @@ export const ZONES = [
     max: 11000,
     accent: '#0b2a3d',
     summary:
-      'Named for Hades. Found only in tectonic trenches, isolated from one another like deep-water islands. Pressure exceeds a tonne per square centimetre, yet fish still live here.',
+      'Named for Hades. Found only in tectonic trenches, isolated from one another like deep-water islands. Pressure climbs past a tonne per square centimetre toward the trench floor, yet fish still live here.',
   },
 ];
 
@@ -446,15 +446,15 @@ export function profile({ max = CHALLENGER_DEEP, step = 50 } = {}) {
 const REFERENCE_DEPTHS = [
   { depth: 40, label: 'Recreational scuba limit', note: 'PADI / NOAA recommended maximum' },
   { depth: 100, label: 'Technical scuba limit', note: 'Beyond this, trimix and staged deco' },
-  { depth: 214, label: 'Deepest scuba dive, open circuit', note: 'Ahmed Gabr, Red Sea, 2014' },
+  { depth: 214, label: 'Deepest No-Limits freedive', note: 'Herbert Nitsch, 2007' },
   { depth: 332, label: 'Deepest scuba dive ever', note: 'Ahmed Gabr, Red Sea, 2014' },
   { depth: 535, label: 'Deepest penguin dive', note: 'Emperor penguin, Ross Sea' },
   { depth: 1000, label: 'Bathypelagic boundary', note: 'Sunlight is gone in every band' },
   { depth: 1280, label: 'Deepest reptile dive', note: 'Leatherback turtle' },
   { depth: 2250, label: 'Typical sperm whale hunt', note: 'Physeter macrocephalus' },
   { depth: 2992, label: 'Deepest mammal dive', note: "Cuvier's beaked whale, 3 h 42 min" },
+  { depth: 3682, label: 'Mean ocean depth', note: 'NOAA/WHOI satellite-based estimate (2010)' },
   { depth: 3800, label: 'RMS Titanic', note: 'North Atlantic, 41.7N 49.9W' },
-  { depth: 4267, label: 'Mean ocean depth', note: 'Half the seafloor is deeper than this' },
   { depth: 6000, label: 'Hadal boundary', note: 'Trenches only below this line' },
   { depth: 8336, label: 'Deepest fish ever filmed', note: 'Snailfish, Izu-Ogasawara Trench, 2022' },
   { depth: 10935, label: 'Challenger Deep', note: 'Mariana Trench — the floor' },

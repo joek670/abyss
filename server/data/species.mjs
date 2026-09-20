@@ -34,7 +34,7 @@ export const SPECIES = [
     facts: [
       'A female can carry 300 million eggs, the highest fecundity of any vertebrate.',
       'Tagged individuals dive repeatedly to 200-800 m to feed on gelatinous prey, then return to the surface to rewarm.',
-      'It is the only known vertebrate that recruits a symbiotic skin microbiome by rubbing against other sunfish.',
+      'It visits cleaning stations, where reef fish and even seabirds pick parasites from its skin.',
     ],
   },
   {
@@ -315,15 +315,15 @@ export const SPECIES = [
     sizeCm: 550,
     massKg: 1215,
     bioluminescent: false,
-    iucn: 'Vulnerable',
+    iucn: 'Least Concern',
     diet: 'Krill, copepods, jellyfish',
     sprite: 'megamouth',
     accent: '#8fb8e8',
     blurb:
-      'A 5-metre filter-feeding shark that was completely unknown to science until one tangled itself in a US Navy anchor at 165 m off Hawaii in 1976. Only around 100 have ever been seen.',
+      'A 5-metre filter-feeding shark that was completely unknown to science until one tangled itself in a US Navy anchor at 165 m off Hawaii in 1976. Fewer than 300 have ever been documented.',
     facts: [
       'Its mouth is lined with a reflective silvery band that is thought to attract the plankton it eats.',
-      'It is the only known shark that feeds by ram filter-feeding rather than suction.',
+      'It feeds by engulfment, lunging through plankton with its jaws thrown open — unlike the suction-feeding whale shark or the ram-feeding basking shark.',
       'It swims with a vertical daily migration, rising to shallow water at night and descending by day.',
     ],
   },
@@ -372,7 +372,7 @@ export const SPECIES = [
     facts: [
       'Every zooid is an individual animal; none can survive alone.',
       'The entire colony is bioluminescent, and attacks trigger waves of blue light that ripple along its length.',
-      'Praya dubia is named for the Latin for "ghost", for the way it drifts out of the dark.',
+      'Its name is no help: dubia is Latin for "doubtful", given when nobody could place the animal.',
     ],
   },
   {
