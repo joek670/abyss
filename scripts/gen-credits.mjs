@@ -37,6 +37,17 @@ lines.push('## Code');
 lines.push('');
 lines.push('The application code is MIT licensed — see [LICENSE](LICENSE).');
 lines.push('');
+lines.push(
+  'That licence covers the software: everything in `server/`, `public/js/`, `public/css/` ' +
+    'and `scripts/`, together with the species text, depth ranges and field notes.',
+);
+lines.push('');
+lines.push(
+  '**It does not cover the species photographs.** Those are the work of their respective ' +
+    'photographers and are used under their own licences, listed below. Reusing an image ' +
+    'means complying with *that* licence, not the MIT one.',
+);
+lines.push('');
 lines.push('The oceanographic models are transcriptions of published work:');
 lines.push('');
 lines.push('- **UNESCO (1983)** — *Algorithms for computation of fundamental properties of seawater*,');
