@@ -71,7 +71,11 @@
   /* ── Layout ─────────────────────────────────────────────────────────── */
   --rail-w: 92px;
   --topbar-h: 62px;
-  --strip-h: 68px;
+  /* The instrument strip sits under the home indicator on iOS, so its height
+     carries the safe-area inset. Everything that clears the strip (the rail,
+     the main scroll region, toasts) reads --strip-h and stays correct. */
+  --strip-safe: env(safe-area-inset-bottom, 0px);
+  --strip-h: calc(68px + var(--strip-safe));
   --measure: 68ch;
   --page-max: 1320px;
   --gutter: clamp(1rem, 4vw, 3.5rem);
