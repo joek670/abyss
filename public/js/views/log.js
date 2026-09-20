@@ -67,7 +67,7 @@ export const logView = {
         {
           style: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
             gap: 'var(--s-5)',
             alignItems: 'start',
             marginTop: 'var(--s-6)',
@@ -87,7 +87,7 @@ export const logView = {
               {
                 style: {
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(min(190px, 100%), 1fr))',
                   gap: 'var(--s-4)',
                 },
               },

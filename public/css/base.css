@@ -257,6 +257,12 @@ hr {
   margin-inline-start: auto;
   overflow-x: auto;
   scrollbar-width: none;
+  /* The links do not fit on a phone, so this strip scrolls. Snap so a swipe
+     settles on a whole link, and fade the trailing edge so it reads as
+     "more this way" rather than as a truncation bug. */
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--s-3);
+  -webkit-overflow-scrolling: touch;
 }
 .nav::-webkit-scrollbar { display: none; }
 
@@ -268,6 +274,7 @@ hr {
   font-weight: 500;
   color: var(--text-1);
   white-space: nowrap;
+  scroll-snap-align: start;
   transition: color var(--d-fast) linear, background var(--d-fast) linear;
 }
 .nav a:hover { color: var(--text-0); background: var(--surface-2); }
@@ -607,7 +614,14 @@ hr {
 
 @media (max-width: 640px) {
   :root { --topbar-h: 56px; }
-  .nav { gap: 0; }
+  /* Claw back width for the nav: the topbar's 24px gaps cost more than the
+     links they separate. */
+  .topbar__inner { gap: var(--s-2); }
+  .nav {
+    gap: 0;
+    mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+  }
   .nav a { padding: var(--s-2); font-size: var(--t--2); }
   .brand__text { display: none; }
   .iconbtn__hint { display: none; }

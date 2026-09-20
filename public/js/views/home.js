@@ -99,7 +99,7 @@ export const homeView = {
     const grid = h('div', {
       style: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
         gap: 'var(--s-5)',
         alignItems: 'start',
       },

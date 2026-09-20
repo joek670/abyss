@@ -140,6 +140,34 @@ async function main() {
   const missing = required.filter((f) => !existsSync(join(DIST, f)));
   check('dist contains every required file', missing.length === 0, `missing: ${missing.join(', ')}`);
 
+  // Regression guard for the phone-layout bug class. `repeat(auto-fit,
+  // minmax(300px, 1fr))` cannot produce a track narrower than 300px, so on a
+  // viewport below that the grid pushes past the screen and .panel's
+  // overflow:hidden silently cuts the content off — which is how the dive
+  // console shipped with its pressure readings clipped mid-number. Wrapping
+  // the floor in min(..., 100%) keeps the multi-column intent and lets the
+  // track collapse. Source-level because the failure is a layout one that
+  // --dump-dom cannot see.
+  const gridSources = [
+    ...['base.css', 'components.css', 'views.css'].map((f) => ['public/css/' + f, join(ROOT, 'public', 'css', f)]),
+    ...['about.js', 'atlas.js', 'console.js', 'home.js', 'log.js', 'post.js', 'species.js'].map((f) => [
+      'public/js/views/' + f,
+      join(ROOT, 'public', 'js', 'views', f),
+    ]),
+  ].filter(([, abs]) => existsSync(abs));
+  const rigidTracks = [];
+  for (const [label, abs] of gridSources) {
+    const src = readFileSync(abs, 'utf8');
+    for (const m of src.matchAll(/repeat\(\s*auto-(?:fit|fill)\s*,\s*minmax\(\s*(\d+)px/g)) {
+      rigidTracks.push(`${label}: minmax(${m[1]}px, ...)`);
+    }
+  }
+  check(
+    'auto-fit grid tracks can collapse below their floor',
+    rigidTracks.length === 0,
+    `use minmax(min(Npx, 100%), 1fr) — ${rigidTracks.join('; ')}`,
+  );
+
   const mode = existsSync(join(DIST, 'js', 'core', 'mode.js'))
     ? readFileSync(join(DIST, 'js', 'core', 'mode.js'), 'utf8')
     : '';

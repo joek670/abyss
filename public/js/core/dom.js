@@ -180,13 +180,21 @@ export function unit(value, suffix, dp = 0) {
  * 0.031 %, and 4.1e-9 % are all shown honestly rather than all rounding to
  * "0 %", which would be a lie about the photic zone.
  */
-export function percent(value, dp = 2) {
+/**
+ * Beer-Lambert decay has no lower bound, so the blue band at full ocean depth
+ * evaluates to about 1.9e-117 % of surface irradiance. Printing that implies
+ * 117 orders of magnitude of meaningful precision for a quantity that passed
+ * "no photons at all" around 1000 m. Below FLOOR the readout says so instead.
+ */
+const PERCENT_FLOOR = 1e-9;
+
+export function percent(value, dp = 2, floor = PERCENT_FLOOR) {
   if (!Number.isFinite(value)) return '—';
   if (value === 0) return '0 %';
   const abs = Math.abs(value);
   if (abs >= 1) return `${num(value, dp)} %`;
   if (abs >= 0.01) return `${num(value, 3)} %`;
-  if (abs >= 1e-6) return `${value.toExponential(1).replace('e-', 'e−')} %`;
+  if (abs < floor) return `< ${floor.toExponential(0).replace('e-', 'e−')} %`;
   return `${value.toExponential(1).replace('e-', 'e−')} %`;
 }
 
