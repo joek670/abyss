@@ -24,7 +24,19 @@ const ROOT = join(HERE, '..');
 const DIST = join(ROOT, 'dist');
 
 const PORT = Number(process.env.ABYSS_STATIC_PORT ?? 8901);
-const BASE = `http://127.0.0.1:${PORT}`;
+
+/**
+ * Served from a SUBDIRECTORY, because that is how GitHub Pages serves a project
+ * site: https://joek670.github.io/abyss/ rather than the domain root.
+ *
+ * The first deployment was tested at the domain root, passed every assertion,
+ * and was still broken when published — every asset path in the app was
+ * root-absolute, so /css/tokens.css resolved outside the site. Serving under a
+ * base is what reproduces that locally; without it the suite is testing a
+ * URL shape GitHub Pages never uses.
+ */
+const SITE_BASE = '/abyss';
+const BASE = `http://127.0.0.1:${PORT}${SITE_BASE}`;
 
 let passed = 0;
 const failures = [];
@@ -151,7 +163,7 @@ async function main() {
   /* B. Serve it with no backend. */
   const server = spawn(
     process.execPath,
-    ['--disable-warning=ExperimentalWarning', join(ROOT, 'scripts', 'serve-static.mjs'), `--port=${PORT}`],
+    ['--disable-warning=ExperimentalWarning', join(ROOT, 'scripts', 'serve-static.mjs'), `--port=${PORT}`, `--base=${SITE_BASE}`],
     { cwd: ROOT, stdio: 'ignore' },
   );
 
@@ -162,16 +174,31 @@ async function main() {
   }
 
   try {
-    /* C. There is genuinely no API. */
+    /* C. There is genuinely no API — even under the base. */
     const apiProbe = await fetch(`${BASE}/api/health`);
     check(
-      'no API is served (this is what makes it a static build)',
+      'no API is served under the site base',
       apiProbe.status === 404,
       `expected 404, got ${apiProbe.status}`,
     );
 
     const dataProbe = await fetch(`${BASE}/data/species.json`);
-    check('the catalogue is served as a plain file', dataProbe.ok && dataProbe.headers.get('content-type')?.includes('json'));
+    check(
+      'the catalogue is served as a plain file from the base',
+      dataProbe.ok && dataProbe.headers.get('content-type')?.includes('json'),
+    );
+
+    /* C2. Root-absolute asset paths are the bug that broke the first deploy:
+     * /css/tokens.css under /abyss/ resolves outside the site. Assert that the
+     * document references its assets relatively. */
+    const indexHtml = await (await fetch(`${BASE}/`)).text();
+    const absoluteRefs = (indexHtml.match(/(?:src|href)="\/(?!\/)/g) ?? []).length;
+    check(
+      'index.html references assets relatively, not root-absolute',
+      absoluteRefs === 0,
+      `${absoluteRefs} root-absolute reference(s) — these 404 under a subdirectory`,
+    );
+    check('index.html references the stylesheet relatively', indexHtml.includes('href="css/tokens.css"'));
 
     /* D. Every route renders with no server behind it. */
     const routes = [

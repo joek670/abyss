@@ -10,7 +10,13 @@
  * It reuses the real static handler from server/http.mjs, so gzip, ETag and the
  * path-traversal guard are the same code the application server uses.
  *
- *   node scripts/serve-static.mjs [dir] [--port=8899]
+ *   node scripts/serve-static.mjs [dir] [--port=8899] [--base=/abyss/]
+ *
+ * --base reproduces how GitHub Pages serves a PROJECT site: from a
+ * subdirectory of the domain, not the root. The first deployment worked at
+ * 127.0.0.1:8899/ and was broken at joek670.github.io/abyss/ because every
+ * asset path was root-absolute — this flag is what makes that reproducible
+ * locally, and therefore testable.
  */
 import { createServer } from 'node:http';
 import { join, dirname } from 'node:path';
@@ -23,6 +29,8 @@ const ROOT = join(HERE, '..');
 const args = process.argv.slice(2);
 const portArg = args.find((a) => a.startsWith('--port='));
 const PORT = Number(portArg ? portArg.slice(7) : process.env.PORT ?? 8899);
+const baseArg = args.find((a) => a.startsWith('--base='));
+const BASE = baseArg ? baseArg.slice(7).replace(/\/+$/, '') : '';
 const dirArg = args.find((a) => !a.startsWith('--'));
 const DIR = join(ROOT, dirArg ?? 'dist');
 
@@ -30,20 +38,27 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${PORT}`);
 
   /*
-   * Anything under /api is a hard 404.
+   * Anything under the site root's /api is a hard 404.
    *
    * Not a nicety — without this the SPA fallback answers /api/health with
    * index.html and a 200, which makes "there is no backend" impossible to test
    * and would hide a real API dependency behind a page of HTML. GitHub Pages
    * behaves the same way: unknown paths 404.
    */
-  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
+  const apiPath = `${BASE}/api`;
+  if (url.pathname === apiPath || url.pathname.startsWith(`${apiPath}/`)) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('404 — this is a static build; there is no API.\n');
     return;
   }
 
-  await serveStatic(req, res, DIR, url.pathname, { spa: true });
+  // Strip the base so the file handler sees site-root-relative paths, exactly
+  // as GitHub Pages does before it looks for the file.
+  let pathname = url.pathname;
+  if (BASE && pathname.startsWith(BASE)) pathname = pathname.slice(BASE.length) || '/';
+  if (!pathname.startsWith('/')) pathname = '/' + pathname;
+
+  await serveStatic(req, res, DIR, pathname, { spa: true });
 });
 
 server.listen(PORT, '127.0.0.1', () => {

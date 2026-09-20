@@ -41,6 +41,15 @@ function hasRealArtist(artist) {
   return value.length > 0 && !PLACEHOLDER_ARTIST.test(value);
 }
 
+/**
+ * Normalise an image path to be relative to the site root, without a leading
+ * slash. A manifest written by an older fetcher stores "/img/species/x.jpg";
+ * that form breaks any deployment that is not at the domain root.
+ */
+function relativePath(file) {
+  return String(file ?? '').replace(/^\/+/, '');
+}
+
 let cache = null;
 let cachedMtimeMs = 0;
 let cachedMissing = true;
@@ -82,7 +91,12 @@ export function loadImages() {
       const needsCredit = !NO_CREDIT_NEEDED.test(String(entry.licence ?? ''));
       if (needsCredit && !hasRealArtist(entry.artist)) continue;
       clean[slug] = {
-        file: entry.file,
+        // RELATIVE, never root-absolute. GitHub Pages serves project sites from
+        // a subdirectory (/abyss/), where /img/... would resolve outside the
+        // site and 404. Relative paths resolve correctly at / and /abyss/ both,
+        // which is what lets one manifest serve the full-stack server and the
+        // static build.
+        file: relativePath(entry.file),
         artist: hasRealArtist(entry.artist) ? String(entry.artist).trim() : '',
         licence: entry.licence ?? '',
         licenceUrl: entry.licenceUrl ?? '',
