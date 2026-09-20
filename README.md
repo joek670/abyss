@@ -2,21 +2,47 @@
 
 A deep-sea exploration atlas with a live dive console.
 
+**Live:** https://joek670.github.io/abyss/ — the static build, no backend at all.
+
 Every pressure, temperature, salinity, density, sound-speed and light reading in
-the interface is computed on the server from published oceanographic equations.
-Nothing is a lookup table, and nothing is hard-coded in the browser.
+the interface is computed from published oceanographic equations. Nothing is a
+lookup table, and nothing is hard-coded.
 
 ```
-npm start          # http://127.0.0.1:8787
-npm run verify     # 41 physics assertions against published reference values
-npm run test:rules # 33 matching-rule assertions (which photograph may ship)
-npm test           # 101 end-to-end assertions in real headless Chrome
-npm run check      # all three
+npm start              # full stack   http://127.0.0.1:8787
+npm run build:static   # static       dist/, no server
+npm run serve:static   # preview      http://127.0.0.1:8899
+
+npm run verify         # 41 physics assertions against published reference values
+npm run test:rules     # 40 image-matching rule assertions
+npm test               # 101 end-to-end assertions in real headless Chrome
+npm run test:static    # 29 assertions that dist/ works with NO backend
+npm run check:all      # everything, including building and testing dist/
 ```
 
-No install step. No `node_modules`. No build. The server runs on Node's built-in
-`node:http` and `node:sqlite`; the client is hand-written ES modules that the
-browser loads directly.
+No install step. No `node_modules`. No bundler. The server runs on Node's
+built-in `node:http` and `node:sqlite`; the client is hand-written ES modules
+that the browser loads directly.
+
+---
+
+## Two runtimes, one source
+
+The same code runs two ways, and the switch is a build-time constant rather than
+a runtime probe — a wrong flag fails loudly instead of half-working.
+
+| | `npm start` | `npm run build:static` |
+|---|---|---|
+| Physics | computed by the server | computed **in the browser** |
+| Catalogue | SQLite | `data/species.json` |
+| Dive log | SQLite, shared | `localStorage`, per device |
+| Dive telemetry | Server-Sent Events | local simulation |
+| Needs a server | yes | **no** |
+
+The physics and search modules have **zero imports**, so the static build copies
+the very files the server runs. `npm run test:static` asserts that the numbers
+the browser computes equal the numbers the server computed — because "the same
+module runs in both" is a claim, and a claim is not a test.
 
 ---
 
@@ -27,9 +53,10 @@ browser loads directly.
 | **Surface** | The premise, plus a live spectral-extinction panel |
 | **Descent** | Scroll-driven passage through all five depth zones |
 | **Atlas** | 36 specimens, searchable and filterable, URL-addressable |
-| **Console** | Set any depth, or run a simulated descent with live SSE telemetry |
-| **Dive Log** | Record dives to SQLite; the physics is frozen with each entry |
+| **Console** | Set any depth, or run a simulated descent with live telemetry |
+| **Dive Log** | Record dives; the physics is frozen with each entry |
 | **Method** | The equations, their sources, and what is approximated |
+| **Notes** | How it was built — the interesting parts and the mistakes |
 
 ---
 
