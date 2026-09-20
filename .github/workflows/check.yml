@@ -1,0 +1,54 @@
+# Run the project's own checks on every pull request.
+#
+# `npm run check` is what a contributor runs locally: the physics harness,
+# the match-rule tests, and the browser/API suite. Until this workflow
+# existed nothing ran on a pull request, so a regression in the physics
+# engine reached main untested — and pages.yml then published it, because
+# it builds from source on every push to main.
+#
+# There is no dependency install step, for the same reason pages.yml has
+# none: the project has no dependencies. Node 24 matches the build, whose
+# module graph reaches node:sqlite through the database layer.
+
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push supersedes the run in flight for the same ref.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # The browser suite drives headless Chrome over the DevTools protocol.
+      # ubuntu-latest ships Chrome at this path; scripts/browser-tests.mjs
+      # also probes it directly, but setting CHROME_PATH makes the dependency
+      # explicit and fails loudly if the image ever stops providing it.
+      - name: Locate Chrome
+        run: |
+          test -x /usr/bin/google-chrome || {
+            echo "::error::No Chrome at /usr/bin/google-chrome on this runner image."
+            exit 1
+          }
+          echo "CHROME_PATH=/usr/bin/google-chrome" >> "$GITHUB_ENV"
+
+      - name: Physics harness, match rules, browser and API suites
+        run: npm run check
+
+      - name: Static build and its smoke test
+        run: npm run build:static && npm run test:static
