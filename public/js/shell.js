@@ -84,10 +84,23 @@ function initStrip() {
 
   let previous = {};
 
-  /** Flash a readout when its value changes materially, so motion is legible. */
-  function set(el, key, text, changed) {
+  /**
+   * Flash a readout when its value changes materially, so motion is legible.
+   * The unit is rendered as its own element so it can be set smaller and
+   * dimmer than the figure — at strip width the unit is the first thing that
+   * should give way visually, and it keeps the columns from reading as one
+   * undifferentiated run of mono text.
+   */
+  function set(el, key, value, unit, changed) {
     if (!el) return;
-    el.textContent = text;
+    if (unit) {
+      el.replaceChildren(
+        document.createTextNode(value),
+        h('span', { class: 'readout__u' }, unit),
+      );
+    } else {
+      el.textContent = value;
+    }
     if (changed) {
       el.classList.add('is-flash');
       clearTimeout(el._flashTimer);
@@ -112,14 +125,19 @@ function initStrip() {
     const changed = (key, v, eps) =>
       previous[key] === undefined || Math.abs(previous[key] - v) > eps;
 
-    set(els.pressure, 'p', `${num(o.pressureBar, o.pressureBar < 10 ? 2 : 1)} bar`, changed('p', o.pressureBar, 0.05));
-    set(els.temp, 't', `${num(o.temperature, 2)} °C`, changed('t', o.temperature, 0.01));
-    set(els.sal, 's', `${num(o.salinity, 2)} PSU`, changed('s', o.salinity, 0.01));
-    set(els.sound, 'c', `${num(o.soundSpeed, 1)} m/s`, changed('c', o.soundSpeed, 0.1));
-    set(els.density, 'd', `${num(o.density, 1)}`, changed('d', o.density, 0.1));
+    set(els.pressure, 'p', num(o.pressureBar, o.pressureBar < 10 ? 2 : 1), 'bar', changed('p', o.pressureBar, 0.05));
+    set(els.temp, 't', num(o.temperature, 2), '°C', changed('t', o.temperature, 0.01));
+    set(els.sal, 's', num(o.salinity, 2), 'PSU', changed('s', o.salinity, 0.01));
+    set(els.sound, 'c', num(o.soundSpeed, 1), 'm/s', changed('c', o.soundSpeed, 0.1));
+    set(els.density, 'd', num(o.density, 1), 'kg/m³', changed('d', o.density, 0.1));
 
     const blue = o.light?.bands?.find((b) => b.key === 'blue');
-    set(els.light, 'l', blue ? percent(blue.percent, 2) : '—', changed('l', blue?.percent ?? 0, 0.001));
+    // percent() returns the figure and its sign together ("0.031 %", "< 1e−9 %");
+    // split the trailing unit back off so it styles like the others.
+    const light = blue ? percent(blue.percent, 2) : '—';
+    const cut = light.lastIndexOf(' %');
+    set(els.light, 'l', cut > 0 ? light.slice(0, cut) : light, cut > 0 ? '%' : '',
+        changed('l', blue?.percent ?? 0, 0.001));
 
     previous = { p: o.pressureBar, t: o.temperature, s: o.salinity, c: o.soundSpeed, d: o.density, l: blue?.percent };
 
