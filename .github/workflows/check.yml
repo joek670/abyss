@@ -29,9 +29,14 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to a commit, not to a tag. `@v4` is a branch pointer
+      # the action's own repository can move, so trusting it means trusting
+      # whatever that repository points it at on the morning this workflow next
+      # runs. The trailing comment is the release the commit belongs to; bump
+      # both together.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
 
