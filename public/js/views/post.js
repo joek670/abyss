@@ -82,13 +82,13 @@ export const postView = {
         h('strong', null, '1,086 bar'),
         '. The integration gives ',
         h('strong', null, '1,128 bar'),
-        '. One of those is wrong, and it is not the one you would guess: with seawater ' +
-          'denser than 1,000 kg/m³ the pressure gradient cannot fall below 1.0 dbar per ' +
-          'metre, so 10,935 m cannot be under 1,093 bar. The familiar 1,086 figure is ',
+        '. One of those is wrong, and it is not the one you would guess: the pressure ' +
+          'gradient is ρg⁄10⁴ dbar per metre, and even the lightest seawater under ' +
+          'equatorial gravity clears 1.0 dbar per metre, so 10,935 m cannot be under ' +
+          '1,094 bar. The familiar 1,086 figure is ',
         h('em', null, 'below the physical floor'),
-        ' — it is not a different measurement, it is an impossible one, descended from ' +
-          'a 1960 estimate at a shallower sounding. The test suite asserts that floor ' +
-          'explicitly so the error cannot creep back in.',
+        ' — not a different measurement but an impossible one, whatever its provenance. ' +
+          'The test suite asserts that floor explicitly so the error cannot creep back in.',
       ),
       h(
         'p',

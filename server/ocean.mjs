@@ -501,7 +501,9 @@ export function equivalences(depthM) {
     pressurePsi: s.pressurePsi,
     kgPerCm2,
     atmospheres: s.pressureAtm,
-    elephantsPerCm2: pa / elephantPa / 10000 * 1,
+    // Elephants stacked on a single square centimetre. Cross-checks against
+    // the engine's own kg/cm2: 1150 kg/cm2 at full depth / 6000 kg = 0.19.
+    elephantsPerCm2: (pa * 1e-4) / (6000 * G),
     elephantEquivalents: pa / elephantPa,
     blueWhalesStacked: pa / whalePa,
     // Steel yields around 250 MPa; how much of that budget is spent here.

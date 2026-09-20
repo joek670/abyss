@@ -83,7 +83,7 @@ check(
 // 10935 m must exceed ~1094 bar however generously you round.
 // NOTE: the figure of "1086 bar" that circulates widely for Challenger Deep
 // is BELOW this floor and is therefore physically impossible; it descends
-// from a 1960 estimate at a shallower sounding depth. The engine's ~1128 bar
+// physically impossible whatever its provenance. The engine's ~1128 bar
 // is consistent with the modern in-situ measurement of ~1100-1130 bar.
 const deepest = pressureAt(CHALLENGER_DEEP);
 check('deep pressure above hydrostatic floor', deepest > 1094 ? 1 : 0, 1, 0, '');
