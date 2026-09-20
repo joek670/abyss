@@ -26,6 +26,9 @@
 /** Standard gravity (m/s^2), ISO 80000-3. */
 export const G = 9.80665;
 
+/** Standard atmosphere (Pa), ISO 2533. */
+export const ATM_PA = 101325;
+
 /** Mean surface pressure of the atmosphere (Pa). */
 export const P_ATM = 101325;
 
@@ -40,7 +43,12 @@ export const DEEPEST_FISH = 8336;
  * ------------------------------------------------------------------ */
 
 /**
- * Globally averaged open-ocean temperature in degrees Celsius.
+ * Temperature in degrees Celsius for a warm, low-latitude open-ocean
+ * profile. This is NOT a global mean: the real global-mean sea surface is
+ * near 18 C, and the surface field spans -1.8 C at the poles to over 30 C
+ * in the tropics. The curve below is a representative synthetic profile
+ * fitted for shape, not an observational climatology (for that, see WOA
+ * or Argo).
  *
  * Three superimposed terms:
  *   - a warm surface reservoir decaying with a 300 m e-folding scale
@@ -61,7 +69,8 @@ export function temperatureAt(depthM) {
 }
 
 /**
- * Globally averaged salinity in practical salinity units (PSU).
+ * Salinity in practical salinity units (PSU) for the same representative
+ * profile. Plausible open-ocean values, synthetic rather than observed.
  * Surface enrichment from net evaporation, a shallow subsurface maximum,
  * relaxing to a near-uniform 34.65 PSU deep water mass.
  */
@@ -298,7 +307,7 @@ export const ZONES = [
     max: 200,
     accent: '#6fd8ea',
     summary:
-      'The only layer with enough light for photosynthesis. Roughly 90 % of marine life lives here, and it is where the ocean exchanges heat and gas with the atmosphere.',
+      'The only layer with enough light for photosynthesis, and so the source of nearly all the ocean\'s primary production. It is where the ocean exchanges heat and gas with the atmosphere.',
   },
   {
     id: 'mesopelagic',
@@ -308,7 +317,7 @@ export const ZONES = [
     max: 1000,
     accent: '#2f8fc4',
     summary:
-      'Sunlight is too weak for plants but bright enough for animals to be seen from below. This is the domain of counterillumination, vertical migration, and the largest daily movement of biomass on the planet.',
+      'Sunlight is too weak for plants but bright enough for animals to be seen from below. This is the domain of counterillumination and vertical migration — commonly described as the largest daily movement of biomass on the planet.',
   },
   {
     id: 'bathypelagic',
@@ -318,7 +327,7 @@ export const ZONES = [
     max: 4000,
     accent: '#1d5f8a',
     summary:
-      'No sunlight reaches here at all. Every photon is biological. Food arrives only as marine snow falling from above, so bodies are built to conserve energy rather than to chase.',
+      'No sunlight reaches here at all, and almost every photon is biological — bioluminescence, with hydrothermal and chemical sources elsewhere in the deep. Food arrives only as marine snow falling from above, so bodies are built to conserve energy rather than to chase.',
   },
   {
     id: 'abyssopelagic',
@@ -499,7 +508,11 @@ export function equivalences(depthM) {
     steelYieldFraction: pa / 250e6,
     // A 10 cm diameter viewport on a submersible sees this much force.
     viewportForceNewtons: pa * Math.PI * 0.05 ** 2,
-    humanLungVolumeCompressedMl: 6000 / (1 + pa / 1.0e9 * 0),
+    // Boyle's law on a 6 L total lung capacity, against ABSOLUTE pressure
+    // (the engine's pressure is gauge, so one atmosphere is added back).
+    // This is the gas-law figure only: a real chest stops shrinking near
+    // residual volume as blood shifts into the thoracic cavity.
+    humanLungVolumeCompressedMl: 6000 * (ATM_PA / (pa + ATM_PA)),
     note: 'Comparisons are computed from the integrated hydrostatic pressure, not tabulated.',
   };
 }

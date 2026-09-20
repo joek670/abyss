@@ -58,8 +58,12 @@ export const aboutView = {
         h('strong', null, 'UNESCO 1983 (EOS-80)'),
         ' equation of state, including the secant bulk modulus ',
         h('code', null, 'K(T, S, p)'),
-        ', so a parcel at 10,000 m is correctly reported as about 4.6 % denser than the ' +
-          'same parcel at the surface.',
+        ', so a parcel at 10,000 m is reported as about 4.6 % denser than the ' +
+          'same parcel at the surface. One caveat the sound-speed section states and ' +
+          'this one must too: EOS-80 was fitted for sea pressures up to 1,000 bar. ' +
+          'Below roughly 9,800 m — and so at Challenger Deep — the density, and the ' +
+          'pressure integrated from it, are an extrapolation beyond the fitted range ' +
+          'rather than a validated result.',
       ),
       h(
         'div.equation',

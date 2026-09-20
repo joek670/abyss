@@ -139,7 +139,7 @@ check(
 );
 
 console.log('\n── Water column shape ────────────────────────────────────────────');
-check('SST (global mean) 22-29 C', stateAt(0).temperature, 25.5, 0.14, ' C');
+check('SST (warm low-latitude profile) 22-29 C', stateAt(0).temperature, 25.5, 0.14, ' C');
 check('temperature at 1000 m 3-6 C', stateAt(1000).temperature, 3.9, 0.35, ' C');
 check('temperature at 4000 m 1-3 C', stateAt(4000).temperature, 2.0, 0.5, ' C');
 check('hadal water warmer than abyssal', stateAt(10935).temperature > stateAt(4000).temperature ? 1 : 0, 1, 0, '');

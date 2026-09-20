@@ -104,7 +104,7 @@ export const postView = {
       h(
         'p',
         { style: { color: 'var(--text-2)' } },
-        h('em', null, 'Temperature and salinity are empirically fitted to a global-mean ' +
+        h('em', null, 'Temperature and salinity are empirically fitted to a warm low-latitude ' +
           'profile rather than measured, and the Method page says so. A model that hides ' +
           'its approximations is worse than one that lists them.'),
       ),
@@ -328,7 +328,7 @@ export const postView = {
       h(
         'p',
         null,
-        'What it does not do: temperature and salinity are global-mean fits and cannot ' +
+        'What it does not do: temperature and salinity are synthetic profile fits and cannot ' +
           'show a 30 °C tropical surface or a −1.8 °C polar one; the dive stream is a ' +
           'kinematic simulation, not a vehicle model, with only the timing compressed; ' +
           'and six of the 36 species have no freely-licensed photograph at all, so they ' +
