@@ -195,7 +195,7 @@ export const SPECIES = [
     sizeCm: 1300,
     massKg: 275,
     bioluminescent: false,
-    iucn: 'Not Evaluated',
+    iucn: 'Least Concern',
     diet: 'Deep-sea fish, other squid',
     sprite: 'squid',
     accent: '#e0a8ff',
@@ -205,6 +205,9 @@ export const SPECIES = [
       'Eye size scales with the need to detect the faint bioluminescent glow stirred up by a hunting sperm whale.',
       'Genetic analysis in 2013 showed surprisingly low global diversity, suggesting a single worldwide species.',
       'Its tentacle clubs carry hundreds of toothed suckers that leave circular scars on sperm whale skin.',
+    ],
+    sources: [
+      'IUCN Red List 2014: e.T163265A991505 (Allcock & Barratt) — Least Concern',
     ],
   },
   {
@@ -629,7 +632,7 @@ export const SPECIES = [
     sizeCm: 1000,
     massKg: 495,
     bioluminescent: true,
-    iucn: 'Not Evaluated',
+    iucn: 'Least Concern',
     diet: 'Patagonian toothfish, other squid',
     sprite: 'colossal-squid',
     accent: '#d88fd8',
@@ -639,6 +642,9 @@ export const SPECIES = [
       'It is the only squid known to have hooks that swivel in their sockets.',
       'Its beak is the largest of any cephalopod, and intact beaks are regularly found in the stomachs of sperm whales.',
       'Its mantle is filled with ammonium chloride solution, making it neutrally buoyant without a gas-filled chamber.',
+    ],
+    sources: [
+      'IUCN Red List: Mesonychoteuthis hamiltoni — Least Concern',
     ],
   },
   {
@@ -882,7 +888,11 @@ export const SPECIES = [
     facts: [
       'The record has never been repeated, and it is now thought the specimen may have been caught shallower and the net sampled deeper on the way up.',
       'Its specific name honours the Danish research vessel Galathea II, which collected it.',
-      'It is one of only a handful of fish species confirmed to live below 8000 m.',
+      'Confirmed records for the species sit far shallower; the 8,370 m figure rests entirely on that one contested trawl.',
+    ],
+    sources: [
+      'Nielsen (1977), Galathea Report 14 — original description and the 8,370 m Puerto Rico Trench trawl',
+      'Depth record contested: the trawl used a non-closing net, so capture may have occurred shallower',
     ],
   },
 ];
