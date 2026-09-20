@@ -5,6 +5,7 @@
  * a published source. Run with `npm run verify`. A non-zero exit means the
  * physics has drifted and the UI must not be trusted.
  */
+import { SPECIES } from '../server/data/species.mjs';
 import {
   stateAt,
   density,
@@ -15,6 +16,7 @@ import {
   lightAt,
   bandExtinctionDepth,
   profile,
+  ZONES,
   CHALLENGER_DEEP,
 } from '../server/ocean.mjs';
 
@@ -166,6 +168,51 @@ console.log(
   `  Titanic (3800 m): ${s2.pressureBar.toFixed(0)} bar | ${s2.pressureAtm.toFixed(0)} atm | ` +
     `${s2.pressurePsi.toFixed(0)} psi | ${s2.temperature.toFixed(2)} C`,
 );
+
+console.log('\n── Specimen catalogue ────────────────────────────────────────────');
+// The catalogue is the part of the atlas with no published reference to check
+// against, so these are the assertions that CAN be made mechanically. They
+// cannot tell you a depth is right, only that the record is self-consistent.
+// Provenance is tracked per record in `sources` (issue #4).
+const ZONE_BOUNDS = Object.fromEntries(ZONES.map((z) => [z.id, [z.min, z.max]]));
+const IUCN_VOCAB = new Set([
+  'Not Evaluated', 'Data Deficient', 'Least Concern', 'Near Threatened',
+  'Vulnerable', 'Endangered', 'Critically Endangered',
+  'Extinct in the Wild', 'Extinct',
+]);
+
+const badRange = SPECIES.filter((sp) => !(sp.depthMin < sp.depthMax));
+check('every depth range is ordered', badRange.length ? 0 : 1, 1, 0, '');
+if (badRange.length) console.log(`         ${badRange.map((s) => s.slug).join(', ')}`);
+
+const badDepth = SPECIES.filter((sp) => sp.depthMin < 0 || sp.depthMax > CHALLENGER_DEEP);
+check('no depth outside 0..Challenger Deep', badDepth.length ? 0 : 1, 1, 0, '');
+if (badDepth.length) console.log(`         ${badDepth.map((s) => s.slug).join(', ')}`);
+
+const badZone = SPECIES.filter((sp) => {
+  const b = ZONE_BOUNDS[sp.zone];
+  return !b || sp.depthMax < b[0] || sp.depthMin > b[1];
+});
+check('declared zone overlaps the depth range', badZone.length ? 0 : 1, 1, 0, '');
+if (badZone.length) console.log(`         ${badZone.map((s) => `${s.slug} (${s.zone})`).join(', ')}`);
+
+const badIucn = SPECIES.filter((sp) => !IUCN_VOCAB.has(sp.iucn));
+check('IUCN status drawn from the Red List vocabulary', badIucn.length ? 0 : 1, 1, 0, '');
+if (badIucn.length) console.log(`         ${badIucn.map((s) => `${s.slug}: ${s.iucn}`).join(', ')}`);
+
+const badSize = SPECIES.filter((sp) => !(sp.sizeCm > 0) || !(sp.massKg > 0));
+check('every record has a positive size and mass', badSize.length ? 0 : 1, 1, 0, '');
+if (badSize.length) console.log(`         ${badSize.map((s) => s.slug).join(', ')}`);
+
+const dupes = SPECIES.map((s) => s.slug).filter((v, i, a) => a.indexOf(v) !== i);
+check('slugs are unique', dupes.length ? 0 : 1, 1, 0, '');
+
+const sourced = SPECIES.filter((sp) => Array.isArray(sp.sources) && sp.sources.length).length;
+console.log(
+  `[  ..  ] ${'records carrying a source'.padEnd(52)} ${sourced} of ${SPECIES.length}` +
+    `  (issue #4 — not yet an assertion)`,
+);
+
 
 console.log(
   `\n${failed === 0 ? 'ALL CHECKS PASSED' : 'FAILURES PRESENT'} — ${passed} passed, ${failed} failed\n`,
