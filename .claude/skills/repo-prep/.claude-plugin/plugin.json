@@ -1,0 +1,14 @@
+{
+  "name": "repo-prep",
+  "version": "0.1.0",
+  "description": "Readies each git repository a session starts in: turns on its tracked .githooks, fast-forwards a stale local default branch, and points CHROME_PATH at Playwright's Chromium.",
+  "author": { "name": "joek670" },
+  "userConfig": {
+    "trustHooksFrom": {
+      "type": "string",
+      "title": "Turn on git hooks for these owners",
+      "description": "Comma-separated GitHub owners. repo-prep turns on a repository's tracked .githooks only when its origin belongs to one of them, since a hook runs that repository's code on every commit.",
+      "default": "joek670"
+    }
+  }
+}
