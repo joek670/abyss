@@ -36,3 +36,13 @@ If the session's branch was already merged, start it again from the latest
 
 In those cases, push and open the pull request anyway, then say what is
 blocking the merge.
+
+The `ship-gate` mod (`.claude/skills/ship-gate/`) enforces this list, and
+green checks, when a merge goes through the GitHub tools, from the rules in
+`.claude/ship-gate.json` on `main`. It runs only in sessions that load it;
+its README says which. Change that file together with this list. When it
+refuses a merge, that is one of the cases above, or Checks have not finished:
+leave the pull request open and pass on the reasons it gave, or merge again
+once the green result arrives. A change to the gate itself, under
+`.claude/skills/ship-gate/` or `.claude/ship-gate.json`, is always left for
+a person to merge, whether or not the gate is loaded.

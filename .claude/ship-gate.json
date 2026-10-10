@@ -1,0 +1,6 @@
+{
+  "$comment": "Read from main by the ship-gate mod (.claude/skills/ship-gate) whenever Claude merges a pull request. Mirrors 'Stop and ask instead of merging when' in CLAUDE.md, plus green Checks, since a merge to main publishes the live site. Change the two together. A pull request that changes this file waits for a person to merge it.",
+  "holdDeletions": true,
+  "holdPaths": [".github/", "Dockerfile"],
+  "requireGreenChecks": true
+}
