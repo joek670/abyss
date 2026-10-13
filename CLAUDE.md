@@ -6,7 +6,12 @@ When a task changes files here, finish the whole loop in the same turn. Don't
 stop at "pushed" and wait to be told to open or merge a pull request.
 
 1. Run `npm run check:all` locally first. It covers what CI runs, and there
-   is nothing to install.
+   is nothing to install. In a cloud session the browser suites need
+   `CHROME_PATH` pointed at Playwright's Chromium
+   (`/opt/pw-browsers/chromium-*/chrome-linux/chrome`); the `repo-prep` mod
+   (`.claude/skills/repo-prep/`) sets it when it is loaded. Without it they
+   print `No Chrome or Edge binary found` and exit, which is a failure, not a
+   pass.
 2. Commit on the session's branch with a clear message, and push it.
 3. Open a pull request into `main`, or update the one already open for the
    branch.
