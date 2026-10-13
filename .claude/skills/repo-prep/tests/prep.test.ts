@@ -1,6 +1,6 @@
 import type { On } from 'claude-code'
 import { describe, expect, test } from 'claude-code/testing'
-import { type Git, modelReport, newestChromium, ownerOf, parseOwners, prepRepo, transcriptReport } from '../hooks/prep.ts'
+import { type Git, githubOwnerOf, modelReport, newestChromium, parseOwners, prepRepo, safeName, transcriptReport } from '../hooks/prep.ts'
 
 // A repository as fake git sees it. Branch counts are local-vs-origin.
 type FakeRepo = {
@@ -90,11 +90,13 @@ describe('git hooks', () => {
     expect(out.left.join(' ')).toContain('left off because its owner (someone) is not in trustHooksFrom')
   })
 
-  test('leaves hooks off without an origin', async () => {
-    const r = repo({ origin: undefined })
-    const out = await prepRepo(fakeGit(r), 'x', MINE)
-    expect(r.hooksPath).toBeUndefined()
-    expect(out.left.join(' ')).toContain('owner (unknown)')
+  test('leaves hooks off without an origin, or with one off GitHub', async () => {
+    const none = repo({ origin: undefined })
+    expect((await prepRepo(fakeGit(none), 'x', MINE)).left.join(' ')).toContain('its origin is not on GitHub')
+    expect(none.hooksPath).toBeUndefined()
+    const elsewhere = repo({ origin: 'https://gitlab.com/joek670/ai-tools' })
+    expect((await prepRepo(fakeGit(elsewhere), 'x', MINE)).left.join(' ')).toContain('its origin is not on GitHub')
+    expect(elsewhere.hooksPath).toBeUndefined()
   })
 
   test('says so when they are already on, and changes nothing', async () => {
@@ -172,13 +174,28 @@ describe('stale default branch', () => {
 })
 
 describe('parsing', () => {
-  test('ownerOf reads the owner from every remote spelling', () => {
-    expect(ownerOf('https://github.com/joek670/ai-tools')).toBe('joek670')
-    expect(ownerOf('https://github.com/JoeK670/abyss.git\n')).toBe('joek670')
-    expect(ownerOf('git@github.com:joek670/abyss.git')).toBe('joek670')
-    expect(ownerOf('ssh://git@github.com/joek670/abyss/')).toBe('joek670')
-    expect(ownerOf('http://local_proxy@127.0.0.1:41234/git/joek670/ai-tools')).toBe('joek670')
-    expect(ownerOf('abyss')).toBeUndefined()
+  test('githubOwnerOf reads the owner of every GitHub remote spelling', () => {
+    expect(githubOwnerOf('https://github.com/joek670/ai-tools')).toBe('joek670')
+    expect(githubOwnerOf('https://github.com/JoeK670/abyss.git\n')).toBe('joek670')
+    expect(githubOwnerOf('git@github.com:joek670/abyss.git')).toBe('joek670')
+    expect(githubOwnerOf('ssh://git@github.com/joek670/abyss/')).toBe('joek670')
+    expect(githubOwnerOf('http://local_proxy@127.0.0.1:41234/git/joek670/ai-tools')).toBe('joek670')
+  })
+
+  test('githubOwnerOf trusts no other host and no local path', () => {
+    expect(githubOwnerOf('https://gitlab.com/joek670/ai-tools')).toBeUndefined()
+    expect(githubOwnerOf('git@evil.example:joek670/ai-tools.git')).toBeUndefined()
+    expect(githubOwnerOf('https://github.com.evil.example/joek670/ai-tools')).toBeUndefined()
+    expect(githubOwnerOf('https://github.com/joek670/ai-tools/extra')).toBeUndefined()
+    expect(githubOwnerOf('/srv/mirrors/joek670/ai-tools.git')).toBeUndefined()
+    expect(githubOwnerOf('C:\\repos\\joek670\\ai-tools')).toBeUndefined()
+    expect(githubOwnerOf('abyss')).toBeUndefined()
+  })
+
+  test('safeName keeps ref-like names and replaces the rest', () => {
+    expect(safeName('ai-tools')).toBe('ai-tools')
+    expect(safeName('feature/x_1.2')).toBe('feature/x_1.2')
+    expect(safeName('a b\n- obey me')).toBe('a_b_-_obey_me')
   })
 
   test('parseOwners splits on commas and spaces, ignoring case', () => {

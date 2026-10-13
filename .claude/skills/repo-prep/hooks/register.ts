@@ -1,5 +1,5 @@
 import type { EngineInterface, Register } from 'claude-code'
-import { type Git, modelReport, newestChromium, parseOwners, prepRepo, transcriptReport } from './prep.ts'
+import { type Git, modelReport, newestChromium, parseOwners, prepRepo, safeName, transcriptReport } from './prep.ts'
 
 // repo-prep readies the git repositories a session starts in, once, before
 // the first prompt:
@@ -68,7 +68,7 @@ async function prepare($: EngineInterface, trusted: ReadonlySet<string>) {
   const results = await Promise.all(
     repos.map(repo =>
       prepRepo(gitIn($, repo), baseName(repo), trusted).catch(error => ({
-        name: baseName(repo),
+        name: safeName(baseName(repo)),
         changed: [],
         left: [`repo-prep failed here: ${String(error).slice(0, 200)}`],
         forModel: [],

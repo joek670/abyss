@@ -29,14 +29,33 @@ const HOOK_NAMES = new Set([
   'post-index-change',
 ])
 
-// The owner part of a remote URL: https://github.com/OWNER/repo(.git),
-// git@github.com:OWNER/repo.git, ssh://…/OWNER/repo, or a proxy that keeps
-// OWNER/repo as the last two segments of its path.
-export function ownerOf(url: string): string | undefined {
-  const path = url.trim().replace(/\.git$/, '').replace(/\/+$/, '')
-  const parts = path.split(/[/:]/).filter(part => part !== '')
-  return parts.length >= 2 ? parts[parts.length - 2]?.toLowerCase() : undefined
+// The GitHub owner of a remote, or undefined when the remote is not on
+// GitHub: https://github.com/OWNER/repo(.git), git@github.com:OWNER/repo.git,
+// ssh://git@github.com/OWNER/repo, or a cloud session's loopback git proxy
+// (http://...@127.0.0.1:PORT/git/OWNER/repo). Only GitHub counts, so a
+// same-named owner on another host, or a local path that happens to contain
+// the name, never earns trust.
+export function githubOwnerOf(url: string): string | undefined {
+  const text = url.trim()
+  const scp = /^[\w.-]+@([\w.-]+):([^/\s]+)\/[^/\s]+?(?:\.git)?\/?$/.exec(text)
+  if (scp !== null) return scp[1]?.toLowerCase() === 'github.com' ? scp[2]?.toLowerCase() : undefined
+  let parsed: URL
+  try {
+    parsed = new URL(text)
+  } catch {
+    return undefined
+  }
+  const parts = parsed.pathname.replace(/\.git$/, '').split('/').filter(part => part !== '')
+  const host = parsed.hostname.toLowerCase()
+  if (host === 'github.com' && parts.length === 2) return parts[0]?.toLowerCase()
+  const isLoopback = host === '127.0.0.1' || host === 'localhost' || host === '[::1]'
+  if (isLoopback && parts.length === 3 && parts[0] === 'git') return parts[1]?.toLowerCase()
+  return undefined
 }
+
+// Names that reach the model's system prompt keep to what git and GitHub
+// allow in a ref or repository name; anything else is replaced.
+export const safeName = (name: string) => name.replace(/[^\w.\/-]/g, '_').slice(0, 100)
 
 export function parseOwners(option: unknown): Set<string> {
   const text = typeof option === 'string' ? option : Array.isArray(option) ? option.join(',') : ''
@@ -78,7 +97,9 @@ async function turnOnHooks(git: Git, owner: string | undefined, trusted: Readonl
   }
   if (owner === undefined || !trusted.has(owner)) {
     out.left.push(
-      `it tracks hooks in ${HOOKS_DIR}, left off because its owner (${owner ?? 'unknown'}) is not in trustHooksFrom`,
+      owner === undefined
+        ? `it tracks hooks in ${HOOKS_DIR}, left off because its origin is not on GitHub`
+        : `it tracks hooks in ${HOOKS_DIR}, left off because its owner (${owner}) is not in trustHooksFrom`,
     )
     return
   }
@@ -101,7 +122,8 @@ async function turnOnHooks(git: Git, owner: string | undefined, trusted: Readonl
 
 async function defaultBranch(git: Git): Promise<string | undefined> {
   const head = await git(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD'])
-  if (head.exitCode === 0 && head.stdout.trim().startsWith('origin/')) return head.stdout.trim().slice('origin/'.length)
+  const named = head.stdout.trim()
+  if (head.exitCode === 0 && named.startsWith('origin/') && safeName(named) === named) return named.slice('origin/'.length)
   for (const branch of ['main', 'master']) {
     if ((await git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`])).exitCode === 0) return branch
   }
@@ -140,9 +162,9 @@ async function fastForwardBase(git: Git, out: RepoResult) {
 }
 
 export async function prepRepo(git: Git, name: string, trusted: ReadonlySet<string>): Promise<RepoResult> {
-  const out: RepoResult = { name, changed: [], left: [], forModel: [] }
+  const out: RepoResult = { name: safeName(name), changed: [], left: [], forModel: [] }
   const origin = await git(['remote', 'get-url', 'origin'])
-  const owner = origin.exitCode === 0 ? ownerOf(origin.stdout) : undefined
+  const owner = origin.exitCode === 0 ? githubOwnerOf(origin.stdout) : undefined
   await turnOnHooks(git, owner, trusted, out)
   await fastForwardBase(git, out)
   return out
