@@ -12,12 +12,15 @@ type Fake = {
   checks?: { name: string; status: string; conclusion: string | null }[]
   state?: string
   failFiles?: boolean
+  // How the file comes back: MCP's nested resource (the default), the flat
+  // block the engine hands a mod, a base64 blob, or the status line alone.
+  shape?: 'nested' | 'flat' | 'blob' | 'status-only'
 }
 
 const HEAD = 'abc1234def5678'
 const MERGE = { tool: 'mcp__github__merge_pull_request', owner: 'joek670', repo: 'abyss', pullNumber: 7 } as const
 
-type Block = { type: string; text?: string; resource?: { uri: string; mimeType: string; text: string } }
+type Block = { type: string; text?: string; [field: string]: unknown }
 
 // What an mcp.call hook answers: the MCP result, under `value`.
 const reply = (content: Block[], isError = false) => ({ value: { content, isError } })
@@ -37,10 +40,15 @@ function fakeGithub(on: On, fake: Fake, server = 'github') {
         )
       }
       const body = typeof fake.config === 'string' ? fake.config : JSON.stringify(fake.config)
-      return reply([
-        { type: 'text', text: 'successfully downloaded text file (SHA: 1234)' },
-        { type: 'resource', resource: { uri: 'repo://joek670/abyss/contents/.claude/ship-gate.json', mimeType: 'text/plain', text: body } },
-      ])
+      const uri = 'repo://joek670/abyss/contents/.claude/ship-gate.json'
+      const status = { type: 'text', text: 'successfully downloaded text file (SHA: 1234)' }
+      const file: Record<NonNullable<Fake['shape']>, Block[]> = {
+        nested: [{ type: 'resource', resource: { uri, mimeType: 'text/plain', text: body } }],
+        flat: [{ type: 'resource', uri, mimeType: 'application/json', text: body }],
+        blob: [{ type: 'resource', uri, mimeType: 'application/octet-stream', blob: btoa(body) }],
+        'status-only': [],
+      }
+      return reply([status, ...file[fake.shape ?? 'nested']])
     }
     if (method === 'get') return text({ state: fake.state ?? 'open', base: { ref: 'main' }, head: { sha: HEAD } })
     if (method === 'get_files') {
@@ -97,6 +105,35 @@ describe('without .claude/ship-gate.json on the base branch', () => {
     const answer = await $.tool.call({ ...MERGE, tool: 'mcp__github__enable_pr_auto_merge' })
     expect(refusedWith(answer)).toBeUndefined()
     expect(merged).toHaveLength(1)
+  })
+})
+
+describe('reading the rules', () => {
+  const held = { config: ABYSS, files: [{ filename: 'server/old.mjs', status: 'removed' }], checks: GREEN }
+
+  test('from the flat resource block the engine hands a mod', async ($, on) => {
+    const { merged } = fakeGithub(on, { ...held, shape: 'flat' })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('deletes server/old.mjs')
+    expect(merged).toHaveLength(0)
+  })
+
+  test("from MCP's nested resource block", async ($, on) => {
+    const { merged } = fakeGithub(on, { ...held, shape: 'nested' })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('deletes server/old.mjs')
+    expect(merged).toHaveLength(0)
+  })
+
+  test('from a base64 blob', async ($, on) => {
+    const { merged } = fakeGithub(on, { ...held, shape: 'blob' })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('deletes server/old.mjs')
+    expect(merged).toHaveLength(0)
+  })
+
+  test('a reply without the file holds the merge and says what came back', async ($, on) => {
+    const { merged } = fakeGithub(on, { ...held, files: [], shape: 'status-only' })
+    const reason = refusedWith(await $.tool.call({ ...MERGE }))
+    expect(reason).toContain('GitHub returned no text for .claude/ship-gate.json on main (got text{text})')
+    expect(merged).toHaveLength(0)
   })
 })
 

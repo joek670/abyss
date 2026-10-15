@@ -30,8 +30,29 @@ type PullRequest = { state: string; base: { ref: string }; head: { sha: string }
 
 type Repo = { server: string; owner: string; repo: string }
 
-const textOf = (blocks: readonly { type: string; text?: string }[]) =>
+type Block = { type: string; text?: string; [field: string]: unknown }
+
+const textOf = (blocks: readonly Block[]) =>
   blocks.map(b => (b.type === 'text' ? b.text ?? '' : '')).join('')
+
+// The text of an embedded resource block. The engine hands a mod the
+// resource's fields on the block itself ({ type: 'resource', uri, mimeType,
+// text }), where MCP's wire format nests them under `resource`; read either.
+// A server may send a file it doesn't take for text as a base64 `blob`.
+function resourceText(block: Block): string | undefined {
+  if (block.type !== 'resource') return undefined
+  const fields = isRecord(block.resource) ? block.resource : block
+  if (typeof fields.text === 'string') return fields.text
+  if (typeof fields.blob === 'string') {
+    const bytes = Uint8Array.from(atob(fields.blob), c => c.charCodeAt(0))
+    return new TextDecoder().decode(bytes)
+  }
+  return undefined
+}
+
+// What came back, for an error message: each block's kind and its fields.
+const shapeOf = (blocks: readonly Block[]) =>
+  blocks.map(b => `${b.type}{${Object.keys(b).filter(k => k !== 'type').join(',')}}`).join(' ') || 'no blocks'
 
 async function githubJson($: EngineInterface, at: Repo, tool: string, args: Record<string, unknown>) {
   const result = await $.mcp.call(at.server, tool, { owner: at.owner, repo: at.repo, ...args })
@@ -55,12 +76,10 @@ async function readConfig($: EngineInterface, at: Repo, base: string): Promise<C
   }
   // The file arrives as an embedded resource beside a one-line status text.
   for (const block of result.content) {
-    const resource = block.resource
-    if (block.type === 'resource' && isRecord(resource) && typeof resource.text === 'string') {
-      return parseConfig(resource.text)
-    }
+    const text = resourceText(block)
+    if (text !== undefined) return parseConfig(text)
   }
-  throw new Error(`GitHub returned no text for ${CONFIG_PATH} on ${base}`)
+  throw new Error(`GitHub returned no text for ${CONFIG_PATH} on ${base} (got ${shapeOf(result.content)})`)
 }
 
 async function listFiles($: EngineInterface, at: Repo, pullNumber: number) {
