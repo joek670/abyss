@@ -12,6 +12,9 @@ type Fake = {
   checks?: { name: string; status: string; conclusion: string | null }[]
   state?: string
   failFiles?: boolean
+  // How the rules file reaches the gate: as Claude Code hands it to hooks (the
+  // default), as the raw MCP embedded resource, or under another file's URI.
+  delivery?: 'engine' | 'mcp' | 'other-file'
 }
 
 const HEAD = 'abc1234def5678'
@@ -37,10 +40,10 @@ function fakeGithub(on: On, fake: Fake, server = 'github') {
         )
       }
       const body = typeof fake.config === 'string' ? fake.config : JSON.stringify(fake.config)
-      return reply([
-        { type: 'text', text: 'successfully downloaded text file (SHA: 1234)' },
-        { type: 'resource', resource: { uri: 'repo://joek670/abyss/contents/.claude/ship-gate.json', mimeType: 'text/plain', text: body } },
-      ])
+      const status = { type: 'text', text: 'successfully downloaded text file (SHA: 1234)' }
+      const uri = `repo://joek670/abyss/sha/1234/contents/${fake.delivery === 'other-file' ? 'README.md' : '.claude/ship-gate.json'}`
+      if (fake.delivery === 'mcp') return reply([status, { type: 'resource', resource: { uri, mimeType: 'text/plain', text: body } }])
+      return reply([status, { type: 'text', text: `[Resource from ${String(e.server)} at ${uri}] ${body}` }])
     }
     if (method === 'get') return text({ state: fake.state ?? 'open', base: { ref: 'main' }, head: { sha: HEAD } })
     if (method === 'get_files') {
@@ -257,6 +260,12 @@ describe('when the gate cannot check, it holds', () => {
     expect(merged).toHaveLength(0)
   })
 
+  test('a text block that is another file, not the rules', async ($, on) => {
+    const { merged } = fakeGithub(on, { config: ABYSS, delivery: 'other-file', checks: GREEN })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('returned no text for .claude/ship-gate.json')
+    expect(merged).toHaveLength(0)
+  })
+
   test('a misspelt rule', async ($, on) => {
     const { merged } = fakeGithub(on, { config: { holdPath: ['.github/'] } })
     expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('unknown key "holdPath"')
@@ -268,6 +277,12 @@ describe('when the gate cannot check, it holds', () => {
     expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('API rate limit exceeded')
     expect(merged).toHaveLength(0)
   })
+})
+
+test('the rules are read from a raw MCP resource block too', async ($, on) => {
+  const { merged } = fakeGithub(on, { config: ABYSS, delivery: 'mcp', files: [{ filename: 'Dockerfile', status: 'removed' }], checks: GREEN })
+  expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('deletes Dockerfile')
+  expect(merged).toHaveLength(0)
 })
 
 test('a GitHub server under another name is asked under that name', async ($, on) => {

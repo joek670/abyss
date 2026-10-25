@@ -1,4 +1,4 @@
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, McpContentBlock, Register } from 'claude-code'
 import {
   CONFIG_PATH,
   type CheckRun,
@@ -33,6 +33,22 @@ type Repo = { server: string; owner: string; repo: string }
 const textOf = (blocks: readonly { type: string; text?: string }[]) =>
   blocks.map(b => (b.type === 'text' ? b.text ?? '' : '')).join('')
 
+// GitHub sends a file as an MCP embedded resource beside a one-line status
+// text. Claude Code hands that resource to hooks rewritten as a text block,
+// "[Resource from <server> at <uri>] <file text>", so both shapes are read;
+// the rewritten one only when its URI names the rules file.
+const RESOURCE_TEXT = /^\[Resource from .+? at (\S+)\] ([\s\S]*)$/
+
+function configText(blocks: readonly McpContentBlock[]): string | undefined {
+  for (const block of blocks) {
+    const resource = block.resource
+    if (block.type === 'resource' && isRecord(resource) && typeof resource.text === 'string') return resource.text
+    const rewritten = block.type === 'text' && typeof block.text === 'string' ? RESOURCE_TEXT.exec(block.text) : null
+    if (rewritten?.[1]?.endsWith(`/${CONFIG_PATH}`)) return rewritten[2]
+  }
+  return undefined
+}
+
 async function githubJson($: EngineInterface, at: Repo, tool: string, args: Record<string, unknown>) {
   const result = await $.mcp.call(at.server, tool, { owner: at.owner, repo: at.repo, ...args })
   const text = textOf(result.content)
@@ -53,14 +69,9 @@ async function readConfig($: EngineInterface, at: Repo, base: string): Promise<C
     if (/does not exist|not found|404/i.test(why)) return undefined
     throw new Error(`could not read ${CONFIG_PATH} on ${base}: ${why.slice(0, 200)}`)
   }
-  // The file arrives as an embedded resource beside a one-line status text.
-  for (const block of result.content) {
-    const resource = block.resource
-    if (block.type === 'resource' && isRecord(resource) && typeof resource.text === 'string') {
-      return parseConfig(resource.text)
-    }
-  }
-  throw new Error(`GitHub returned no text for ${CONFIG_PATH} on ${base}`)
+  const text = configText(result.content)
+  if (text === undefined) throw new Error(`GitHub returned no text for ${CONFIG_PATH} on ${base}`)
+  return parseConfig(text)
 }
 
 async function listFiles($: EngineInterface, at: Repo, pullNumber: number) {
