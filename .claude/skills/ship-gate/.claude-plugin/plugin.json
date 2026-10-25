@@ -1,6 +1,6 @@
 {
   "name": "ship-gate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Holds a GitHub pull request merge that this repository's rules say a person must make: deleted files, protected paths, secret-looking lines, unfinished checks.",
   "author": { "name": "joek670" }
 }
