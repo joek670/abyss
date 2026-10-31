@@ -12,12 +12,13 @@ type Fake = {
   checks?: { name: string; status: string; conclusion: string | null }[]
   state?: string
   failFiles?: boolean
+  configForm?: 'resource' | 'blob' | 'rendered' | 'rendered-joined' | 'missing'
 }
 
 const HEAD = 'abc1234def5678'
 const MERGE = { tool: 'mcp__github__merge_pull_request', owner: 'joek670', repo: 'abyss', pullNumber: 7 } as const
 
-type Block = { type: string; text?: string; resource?: { uri: string; mimeType: string; text: string } }
+type Block = { type: string; text?: string; resource?: { uri: string; mimeType: string; text?: string; blob?: string } }
 
 // What an mcp.call hook answers: the MCP result, under `value`.
 const reply = (content: Block[], isError = false) => ({ value: { content, isError } })
@@ -37,10 +38,21 @@ function fakeGithub(on: On, fake: Fake, server = 'github') {
         )
       }
       const body = typeof fake.config === 'string' ? fake.config : JSON.stringify(fake.config)
-      return reply([
-        { type: 'text', text: 'successfully downloaded text file (SHA: 1234)' },
-        { type: 'resource', resource: { uri: 'repo://joek670/abyss/contents/.claude/ship-gate.json', mimeType: 'text/plain', text: body } },
-      ])
+      const status = 'successfully downloaded text file (SHA: 1234)'
+      const uri = 'repo://joek670/abyss/contents/.claude/ship-gate.json'
+      const rendered = `[Resource from github at ${uri}] ${body}`
+      switch (fake.configForm) {
+        case 'blob':
+          return reply([{ type: 'text', text: status }, { type: 'resource', resource: { uri, mimeType: 'text/plain', blob: btoa(body) } }])
+        case 'rendered':
+          return reply([{ type: 'text', text: status }, { type: 'text', text: rendered }])
+        case 'rendered-joined':
+          return reply([{ type: 'text', text: `${status}\n${rendered}` }])
+        case 'missing':
+          return reply([{ type: 'text', text: status }])
+        default:
+          return reply([{ type: 'text', text: status }, { type: 'resource', resource: { uri, mimeType: 'text/plain', text: body } }])
+      }
     }
     if (method === 'get') return text({ state: fake.state ?? 'open', base: { ref: 'main' }, head: { sha: HEAD } })
     if (method === 'get_files') {
@@ -275,4 +287,31 @@ test('a GitHub server under another name is asked under that name', async ($, on
   expect(refusedWith(await $.tool.call({ ...MERGE, tool: 'mcp__gh_work__merge_pull_request' }))).toContain('deletes Dockerfile')
   expect([...servers]).toEqual(['gh_work'])
   expect(merged).toHaveLength(0)
+})
+
+describe('however the rules file comes back from GitHub', () => {
+  for (const configForm of ['blob', 'rendered', 'rendered-joined'] as const) {
+    test(`${configForm}: a clean pull request merges`, async ($, on) => {
+      const { merged } = fakeGithub(on, {
+        config: ABYSS,
+        configForm,
+        files: [{ filename: 'public/app.js', status: 'modified', patch: '@@ -1 +1 @@\n-a\n+b' }],
+        checks: GREEN,
+      })
+      expect(refusedWith(await $.tool.call({ ...MERGE }))).toBeUndefined()
+      expect(merged).toHaveLength(1)
+    })
+
+    test(`${configForm}: a deleted file still holds the merge`, async ($, on) => {
+      const { merged } = fakeGithub(on, { config: ABYSS, configForm, files: [{ filename: 'server/old.mjs', status: 'removed' }], checks: GREEN })
+      expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('deletes server/old.mjs')
+      expect(merged).toHaveLength(0)
+    })
+  }
+
+  test('with no rules text at all, the merge is held', async ($, on) => {
+    const { merged } = fakeGithub(on, { config: ABYSS, configForm: 'missing', files: [], checks: GREEN })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('returned no text')
+    expect(merged).toHaveLength(0)
+  })
 })

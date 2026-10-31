@@ -33,6 +33,30 @@ type Repo = { server: string; owner: string; repo: string }
 const textOf = (blocks: readonly { type: string; text?: string }[]) =>
   blocks.map(b => (b.type === 'text' ? b.text ?? '' : '')).join('')
 
+// The rules file's text in a get_file_contents result. Servers return it as an
+// embedded resource, with `text` or base64 `blob`. Some sessions hand hooks
+// the result already rendered for the model instead, where the resource is
+// text after a "[Resource from ...]" marker. Anything else is no rules text,
+// and parseConfig still refuses text that isn't a valid rules file.
+function configTextOf(blocks: readonly Record<string, unknown>[]): string | undefined {
+  for (const block of blocks) {
+    const resource = block.resource
+    if (block.type !== 'resource' || !isRecord(resource)) continue
+    if (typeof resource.text === 'string') return resource.text
+    if (typeof resource.blob === 'string') {
+      return new TextDecoder().decode(Uint8Array.from(atob(resource.blob), c => c.charCodeAt(0)))
+    }
+  }
+  for (const block of blocks) {
+    if (block.type !== 'text' || typeof block.text !== 'string') continue
+    const marker = block.text.indexOf('[Resource from ')
+    const end = marker === -1 ? -1 : block.text.indexOf(']', marker)
+    const body = (end === -1 ? block.text : block.text.slice(end + 1)).trim()
+    if (body.startsWith('{')) return body
+  }
+  return undefined
+}
+
 async function githubJson($: EngineInterface, at: Repo, tool: string, args: Record<string, unknown>) {
   const result = await $.mcp.call(at.server, tool, { owner: at.owner, repo: at.repo, ...args })
   const text = textOf(result.content)
@@ -53,14 +77,9 @@ async function readConfig($: EngineInterface, at: Repo, base: string): Promise<C
     if (/does not exist|not found|404/i.test(why)) return undefined
     throw new Error(`could not read ${CONFIG_PATH} on ${base}: ${why.slice(0, 200)}`)
   }
-  // The file arrives as an embedded resource beside a one-line status text.
-  for (const block of result.content) {
-    const resource = block.resource
-    if (block.type === 'resource' && isRecord(resource) && typeof resource.text === 'string') {
-      return parseConfig(resource.text)
-    }
-  }
-  throw new Error(`GitHub returned no text for ${CONFIG_PATH} on ${base}`)
+  const text = configTextOf(result.content as unknown as readonly Record<string, unknown>[])
+  if (text === undefined) throw new Error(`GitHub returned no text for ${CONFIG_PATH} on ${base}`)
+  return parseConfig(text)
 }
 
 async function listFiles($: EngineInterface, at: Repo, pullNumber: number) {
