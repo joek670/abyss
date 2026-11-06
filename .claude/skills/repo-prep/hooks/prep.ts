@@ -63,10 +63,12 @@ export function parseOwners(option: unknown): Set<string> {
 }
 
 // The highest-numbered Playwright Chromium folder (chromium-1194), not the
-// headless shell; undefined when there is none.
-export function newestChromium(names: readonly string[]): string | undefined {
+// headless shell; undefined when there is none. With `headlessShell`, the
+// highest-numbered headless shell folder (chromium_headless_shell-1194).
+export function newestChromium(names: readonly string[], headlessShell = false): string | undefined {
+  const pattern = headlessShell ? /^chromium_headless_shell-(\d+)$/ : /^chromium-(\d+)$/
   return names
-    .map(name => ({ name, build: /^chromium-(\d+)$/.exec(name)?.[1] }))
+    .map(name => ({ name, build: pattern.exec(name)?.[1] }))
     .filter((entry): entry is { name: string; build: string } => entry.build !== undefined)
     .sort((a, b) => Number(b.build) - Number(a.build))[0]?.name
 }

@@ -24,8 +24,11 @@ wrong:
 - **Browser tests can't find Chrome in a cloud session.** Where
   `CHROME_PATH` is unset and `PLAYWRIGHT_BROWSERS_PATH` names a folder with
   Playwright's Chromium (`/opt/pw-browsers` in a cloud session), it sets
-  `CHROME_PATH` to the newest `chromium-N/chrome-linux/chrome`, for every
-  command the session runs. `joek670/abyss`'s browser suites need it.
+  `CHROME_PATH` for every command the session runs. It picks the newest
+  headless shell (`chromium_headless_shell-N/.../chrome-headless-shell`)
+  first, since from build 1243 full Chromium's `--headless=new --dump-dom`
+  hangs until killed. Without a shell it falls back to the newest
+  `chromium-N/chrome-linux*/chrome`. `joek670/abyss`'s browser suites need it.
 
 It says what it did in one transcript line, and tells the model in a short
 system-prompt section only what changes how it works (hooks are on, or

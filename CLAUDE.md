@@ -7,8 +7,9 @@ stop at "pushed" and wait to be told to open or merge a pull request.
 
 1. Run `npm run check:all` locally first. It covers what CI runs, and there
    is nothing to install. In a cloud session the browser suites need
-   `CHROME_PATH` pointed at Playwright's Chromium
-   (`/opt/pw-browsers/chromium-*/chrome-linux/chrome`); the `repo-prep` mod
+   `CHROME_PATH` pointed at Playwright's headless shell
+   (`/opt/pw-browsers/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell`;
+   full Chromium's `chrome` hangs on `--dump-dom`); the `repo-prep` mod
    (`.claude/skills/repo-prep/`) sets it when it is loaded. Without it they
    print `No Chrome or Edge binary found` and exit, which is a failure, not a
    pass.

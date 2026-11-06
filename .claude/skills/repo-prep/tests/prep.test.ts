@@ -207,6 +207,8 @@ describe('parsing', () => {
   test('newestChromium picks the highest build and skips the headless shell', () => {
     expect(newestChromium(['ffmpeg-1011', 'chromium_headless_shell-1194', 'chromium-1181', 'chromium-1194'])).toBe('chromium-1194')
     expect(newestChromium(['firefox-1490'])).toBeUndefined()
+    expect(newestChromium(['chromium-1243', 'chromium_headless_shell-1194', 'chromium_headless_shell-1243'], true)).toBe('chromium_headless_shell-1243')
+    expect(newestChromium(['chromium-1243'], true)).toBeUndefined()
   })
 
   test('reports say nothing when nothing happened', () => {
@@ -322,6 +324,20 @@ describe('a session', () => {
     await $.session.start({ ...START, cwd: '/w/ai-tools' })
     expect(aiTools.hooksPath).toBe('.githooks')
     expect(aiTools.local.master?.behind).toBe(0)
+  })
+
+  test('prefers the headless shell when Playwright ships one', async ($, on) => {
+    const abyss = repo({ origin: 'https://github.com/joek670/abyss', hooks: '', remote: ['main'], local: { main: { ahead: 0, behind: 0 } } })
+    const shell = '/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell'
+    const { envSets } = fakeHost(on, {
+      ...CLOUD,
+      entries: [{ name: 'abyss', kind: 'dir' }],
+      browsers: ['chromium-1243', 'chromium_headless_shell-1243', 'ffmpeg-1011'],
+      files: ['/home/user/abyss/.git', '/opt/pw-browsers', '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', shell],
+      repos: { '/home/user/abyss': abyss },
+    })
+    await $.session.start(START)
+    expect(envSets.CHROME_PATH).toBe(shell)
   })
 
   test('leaves a CHROME_PATH that is already set', async ($, on) => {
