@@ -29,6 +29,14 @@ which is what `CLAUDE.md` asks for. The merge then waits for you on GitHub.
 holds the merge rather than passing it. A repository without the file is
 not gated.
 
+A pull request with a large diff (more than a few hundred KB of patches) has
+a file list too large for the session to pass on in one answer. The hook
+gets a notice saying the answer was saved to a file. ship-gate then reads
+that saved copy, opening only a path in the session's own `tool-results`
+folder. If it can't, it asks GitHub again for fewer files at a time (100,
+20, 5, then 1). If one file's diff is still too large, the merge is held,
+naming the file's position in the pull request.
+
 Two paths are always held: `.claude/ship-gate.json` and
 `.claude/skills/ship-gate/`. The rules are read from the base branch, not
 from the pull request, so a pull request can't loosen the gate it is merged

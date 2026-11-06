@@ -13,6 +13,13 @@ type Fake = {
   state?: string
   failFiles?: boolean
   configForm?: 'resource' | 'blob' | 'rendered' | 'rendered-joined' | 'missing'
+  // Pages of files larger than this many files come back as the session's
+  // "result too large" notice instead of JSON, the full answer saved to a file.
+  tooLargeAbove?: number
+  // Whether reading that saved file works.
+  savedReadable?: boolean
+  // Where the notice says the answer was saved.
+  savedFolder?: string
 }
 
 const HEAD = 'abc1234def5678'
@@ -27,6 +34,15 @@ const text = (value: unknown) => reply([{ type: 'text', text: typeof value === '
 function fakeGithub(on: On, fake: Fake, server = 'github') {
   const merged: Record<string, unknown>[] = []
   const servers = new Set<string>()
+  const saved = new Map<string, string>()
+  const reads: string[] = []
+  const pageSizes: number[] = []
+  on('fs.read', async ($, e) => {
+    reads.push(e.path)
+    const body = saved.get(e.path)
+    if (body === undefined || fake.savedReadable === false) throw new Error(`ENOENT: ${e.path}`)
+    return { value: body }
+  })
   on('mcp.call', async ($, e) => {
     servers.add(e.server)
     const { method, page = 1 } = e.args
@@ -58,8 +74,19 @@ function fakeGithub(on: On, fake: Fake, server = 'github') {
     if (method === 'get_files') {
       if (fake.failFiles) return reply([{ type: 'text', text: 'API rate limit exceeded' }], true)
       const files = fake.files ?? []
-      const start = (Number(page) - 1) * 100
-      return text(files.slice(start, start + 100))
+      const perPage = Number(e.args.perPage ?? 30)
+      pageSizes.push(perPage)
+      const start = (Number(page) - 1) * perPage
+      const body = JSON.stringify(files.slice(start, start + perPage))
+      if (fake.tooLargeAbove !== undefined && Math.min(perPage, files.length - start) > fake.tooLargeAbove) {
+        const path = `${fake.savedFolder ?? '/root/.claude/projects/p/s/tool-results'}/mcp-github-pull_request_read-${saved.size + 1}.txt`
+        saved.set(path, body)
+        return text(
+          `Error: result (${body.length.toLocaleString('en-US')} characters across 1 line) exceeds maximum allowed tokens. ` +
+            `Output has been saved to ${path}.\nFormat: Plain text\n- For targeted searches (find a string): use grep on the file directly.`,
+        )
+      }
+      return text(body)
     }
     if (method === 'get_check_runs') {
       const runs = fake.checks ?? []
@@ -75,7 +102,7 @@ function fakeGithub(on: On, fake: Fake, server = 'github') {
     merged.push({ ...e })
     return { result: [{ type: 'text', text: 'auto-merge on' }] }
   })
-  return { merged, servers }
+  return { merged, servers, reads, pageSizes }
 }
 
 // The reason a refused call carries, however the engine hands it back.
@@ -278,6 +305,56 @@ describe('when the gate cannot check, it holds', () => {
   test('GitHub failing to list the files', async ($, on) => {
     const { merged } = fakeGithub(on, { config: ABYSS, failFiles: true })
     expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('API rate limit exceeded')
+    expect(merged).toHaveLength(0)
+  })
+})
+
+describe('a pull request too large for the session to pass on in one answer', () => {
+  // 30 files, the 23rd deleted: like a large diff, whose file list comes back
+  // as the "result too large" notice instead of JSON.
+  const many = (): File[] => {
+    const files: File[] = Array.from({ length: 30 }, (_, i) => ({ filename: `public/f${i}.js`, status: 'modified', patch: '+x' }))
+    files[22] = { filename: 'server/old.mjs', status: 'removed' }
+    return files
+  }
+
+  test('is read from the saved copy, and its rules still hold the merge', async ($, on) => {
+    const { merged, reads } = fakeGithub(on, { config: ABYSS, files: many(), checks: GREEN, tooLargeAbove: 10 })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('deletes server/old.mjs')
+    expect(reads).toHaveLength(1)
+    expect(merged).toHaveLength(0)
+  })
+
+  test('merges when its saved copy is clean', async ($, on) => {
+    const files = many().map(f => (f.status === 'removed' ? { filename: 'server/new.mjs', status: 'added', patch: '+x' } : f))
+    const { merged } = fakeGithub(on, { config: ABYSS, files, checks: GREEN, tooLargeAbove: 10 })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toBeUndefined()
+    expect(merged).toHaveLength(1)
+    expect(merged[0]?.expectedHeadSha).toBe(HEAD)
+  })
+
+  test('is asked for again in smaller pages when the saved copy cannot be read', async ($, on) => {
+    const { merged, pageSizes } = fakeGithub(on, { config: ABYSS, files: many(), checks: GREEN, tooLargeAbove: 10, savedReadable: false })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('deletes server/old.mjs')
+    // 100 too large; files 1-20 too large, so read in fives; files 21-30 fit in one 20
+    expect(pageSizes).toEqual([100, 20, 5, 5, 5, 5, 20])
+    expect(merged).toHaveLength(0)
+  })
+
+  test('is held, naming the file, when even one file is too large', async ($, on) => {
+    const { merged } = fakeGithub(on, { config: ABYSS, files: many(), checks: GREEN, tooLargeAbove: 0, savedReadable: false })
+    const reason = refusedWith(await $.tool.call({ ...MERGE }))
+    expect(reason).toContain('could not check this merge')
+    expect(reason).toContain('file 1 of the pull request has a diff too large for ship-gate to read')
+    expect(merged).toHaveLength(0)
+  })
+
+  test('never opens a saved path outside the tool-results folder', async ($, on) => {
+    const { merged, reads } = fakeGithub(on, {
+      config: ABYSS, files: many(), checks: GREEN, tooLargeAbove: 10, savedFolder: '/home/user/.ssh',
+    })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('deletes server/old.mjs')
+    expect(reads).toEqual([])
     expect(merged).toHaveLength(0)
   })
 })
