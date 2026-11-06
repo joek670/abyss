@@ -7,7 +7,8 @@ import { type Git, modelReport, newestChromium, parseOwners, prepRepo, safeName,
 //   in trustHooksFrom, since a fresh clone leaves them off;
 // - fast-forwards a stale local default branch to origin's, so a diff
 //   against it shows only the branch's own changes;
-// - points CHROME_PATH at Playwright's Chromium where the environment has
+// - points CHROME_PATH at Playwright's headless shell (or else Chromium)
+//   where the environment has
 //   one (a cloud session) and nothing set it.
 // It tells the person in one transcript line and the model in a short
 // system-prompt section, and /repo-prep runs it again.
@@ -46,18 +47,29 @@ async function findRepos($: EngineInterface): Promise<string[]> {
 }
 
 // Playwright's Chromium, for CHROME_PATH, when it is unset and the
-// environment names a Playwright browsers folder that holds one.
+// environment names a Playwright browsers folder that holds one. The headless
+// shell comes first: from build 1243 the full Chromium's `--headless=new
+// --dump-dom` hangs until killed, while the shell answers in under a second.
+const CANDIDATES: ReadonlyArray<{ headlessShell: boolean; builds: string[]; binary: string }> = [
+  { headlessShell: true, builds: ['chrome-headless-shell-linux64', 'chrome-headless-shell-linux'], binary: 'chrome-headless-shell' },
+  { headlessShell: true, builds: ['chrome-linux'], binary: 'headless_shell' },
+  { headlessShell: false, builds: ['chrome-linux', 'chrome-linux64'], binary: 'chrome' },
+]
+
 async function pointChromePath($: EngineInterface): Promise<string | undefined> {
   if ((await $.env.get('CHROME_PATH')) !== undefined) return undefined
   const browsers = await $.env.get('PLAYWRIGHT_BROWSERS_PATH')
   if (browsers === undefined || !(await $.fs.exists(browsers))) return undefined
-  const chromium = newestChromium((await $.fs.list(browsers)).filter(e => e.kind === 'dir').map(e => e.name))
-  if (chromium === undefined) return undefined
-  for (const build of ['chrome-linux', 'chrome-linux64']) {
-    const binary = joinPath(joinPath(joinPath(browsers, chromium), build), 'chrome')
-    if (await $.fs.exists(binary)) {
-      await $.env.set('CHROME_PATH', binary)
-      return binary
+  const names = (await $.fs.list(browsers)).filter(e => e.kind === 'dir').map(e => e.name)
+  for (const { headlessShell, builds, binary } of CANDIDATES) {
+    const folder = newestChromium(names, headlessShell)
+    if (folder === undefined) continue
+    for (const build of builds) {
+      const path = joinPath(joinPath(joinPath(browsers, folder), build), binary)
+      if (await $.fs.exists(path)) {
+        await $.env.set('CHROME_PATH', path)
+        return path
+      }
     }
   }
   return undefined
