@@ -1,5 +1,16 @@
 import type { EngineInterface, Register } from 'claude-code'
-import { type Git, modelReport, newestChromium, parseOwners, prepRepo, safeName, transcriptReport } from './prep.ts'
+import {
+  type ChromeChange,
+  type Git,
+  isFullChromium,
+  modelReport,
+  newestChromium,
+  parseOwners,
+  pathsNamedUnder,
+  prepRepo,
+  safeName,
+  transcriptReport,
+} from './prep.ts'
 
 // repo-prep readies the git repositories a session starts in, once, before
 // the first prompt:
@@ -7,9 +18,9 @@ import { type Git, modelReport, newestChromium, parseOwners, prepRepo, safeName,
 //   in trustHooksFrom, since a fresh clone leaves them off;
 // - fast-forwards a stale local default branch to origin's, so a diff
 //   against it shows only the branch's own changes;
-// - points CHROME_PATH at Playwright's headless shell, or else its full
-//   Chromium, where the environment has one (a cloud session) and nothing
-//   set it.
+// - points CHROME_PATH at Playwright's headless shell where the environment
+//   has one (a cloud session): when nothing set it (else at the full
+//   Chromium), or in place of a CHROME_PATH that runs the full Chromium.
 // It tells the person in one transcript line and the model in a short
 // system-prompt section, and /repo-prep runs it again.
 
@@ -46,8 +57,8 @@ async function findRepos($: EngineInterface): Promise<string[]> {
   return repos
 }
 
-// Playwright's Chromium, for CHROME_PATH, when it is unset and the
-// environment names a Playwright browsers folder that holds one. The headless
+// Playwright's headless shell, or else its full Chromium, for CHROME_PATH,
+// where the environment names a Playwright browsers folder that holds one. The
 // shell comes first: in build 1243 the full Chromium's `--headless=new
 // --dump-dom` hangs until killed when it gets a fresh --user-data-dir, as
 // test runners give it, while the shell answers in under a second.
@@ -63,20 +74,53 @@ const CANDIDATES: ReadonlyArray<{ headlessShell: boolean; builds: string[]; bina
   { headlessShell: false, builds: ['chrome-linux', 'chrome-linux64'], binary: 'chrome' },
 ]
 
-async function pointChromePath($: EngineInterface): Promise<string | undefined> {
-  if ((await $.env.get('CHROME_PATH')) !== undefined) return undefined
+// A script that CHROME_PATH names is read only up to this size; a browser
+// binary is far larger.
+const MAX_SCRIPT_BYTES = 64 * 1024
+
+const realPathOf = async ($: EngineInterface, path: string) =>
+  (await $.fs.stat(path, { resolve: true }).catch(() => undefined))?.realPath
+
+// Whether CHROME_PATH runs Playwright's full Chromium from `browsers`: that
+// binary, a link to it, or a script naming either. The cloud image's
+// /usr/bin/google-chrome is such a script, `exec /opt/pw-browsers/chromium
+// "$@"`, where /opt/pw-browsers/chromium links to chromium-1243's chrome.
+async function runsFullChromium($: EngineInterface, chromePath: string, browsers: string): Promise<boolean> {
+  const base = (await realPathOf($, browsers)) ?? browsers
+  const stat = await $.fs.stat(chromePath, { resolve: true }).catch(() => undefined)
+  if (stat?.realPath === undefined) return false
+  if (isFullChromium(stat.realPath, base)) return true
+  if (stat.kind !== 'file' || stat.size > MAX_SCRIPT_BYTES) return false
+  const text = await $.fs.read(stat.realPath).catch(() => '')
+  if (!text.startsWith('#!')) return false
+  for (const named of new Set([...pathsNamedUnder(text, browsers), ...pathsNamedUnder(text, base)])) {
+    const real = await realPathOf($, named)
+    if (real !== undefined && isFullChromium(real, base)) return true
+  }
+  return false
+}
+
+// Points an unset CHROME_PATH at the best browser Playwright's folder holds,
+// and one that runs its full Chromium at the headless shell. Any other
+// CHROME_PATH is someone's own choice and stays.
+async function pointChromePath($: EngineInterface): Promise<ChromeChange | undefined> {
+  const current = await $.env.get('CHROME_PATH')
   const browsers = await $.env.get('PLAYWRIGHT_BROWSERS_PATH')
   if (browsers === undefined || !(await $.fs.exists(browsers))) return undefined
+  if (current !== undefined && !(await runsFullChromium($, current, browsers))) return undefined
   const names = (await $.fs.list(browsers)).filter(e => e.kind === 'dir').map(e => e.name)
-  for (const { headlessShell, builds, binary } of CANDIDATES) {
+  // Only the shell is worth putting in place of the full Chromium.
+  for (const { headlessShell, builds, binary } of CANDIDATES.filter(c => current === undefined || c.headlessShell)) {
     const folder = newestChromium(names, headlessShell)
     if (folder === undefined) continue
     for (const build of builds) {
       const path = joinPath(joinPath(joinPath(browsers, folder), build), binary)
-      if (await $.fs.exists(path)) {
-        await $.env.set('CHROME_PATH', path)
-        return path
-      }
+      if (!(await $.fs.exists(path))) continue
+      const change: ChromeChange = { path }
+      if (current !== undefined) change.replaced = current
+      const { deny } = await $.env.set('CHROME_PATH', path)
+      if (deny !== undefined) change.deny = deny
+      return change
     }
   }
   return undefined
