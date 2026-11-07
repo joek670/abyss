@@ -205,6 +205,28 @@ describe('with rules on the base branch', () => {
     expect(merged).toHaveLength(0)
   })
 
+  test('with "holdGateCode": false, gate code merges but the rules file is still held', async ($, on) => {
+    const code = { filename: '.claude/skills/ship-gate/hooks/register.ts', status: 'modified', patch: '+x' }
+    const clean = fakeGithub(on, { config: { holdGateCode: false }, files: [code] })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toBeUndefined()
+    expect(clean.merged).toHaveLength(1)
+  })
+
+  test('with "holdGateCode": false, a change to the rules file is still held', async ($, on) => {
+    const { merged } = fakeGithub(on, {
+      config: { holdGateCode: false },
+      files: [{ filename: '.claude/ship-gate.json', status: 'modified', patch: '+x' }],
+    })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('touches .claude/ship-gate.json')
+    expect(merged).toHaveLength(0)
+  })
+
+  test('a holdGateCode that is not true or false holds the merge', async ($, on) => {
+    const { merged } = fakeGithub(on, { config: { holdGateCode: 'no' } })
+    expect(refusedWith(await $.tool.call({ ...MERGE }))).toContain('holdGateCode is not true or false')
+    expect(merged).toHaveLength(0)
+  })
+
   test('a secret-looking added line holds it, and the refusal never repeats the line', async ($, on) => {
     const { merged } = fakeGithub(on, {
       config: { holdAddedLines: [QDRANT] },

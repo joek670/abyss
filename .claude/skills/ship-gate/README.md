@@ -24,6 +24,7 @@ which is what `CLAUDE.md` asks for. The merge then waits for you on GitHub.
 | `holdPaths` | touches a path: `"infra/"` is a folder, `"Dockerfile"` one file, both from the repository root. A rename is checked at both ends |
 | `holdAddedLines` | adds a line matching a pattern: `{ "name", "pattern" }`, a JavaScript regular expression. The refusal names the pattern, never the line. A changed file whose diff GitHub won't show (binary, very large) is held too, since it can't be checked |
 | `requireGreenChecks` | has a check run on its head that is unfinished or did not pass, or none at all |
+| `holdGateCode` | changes the gate's code under `.claude/skills/ship-gate/`. On unless set to `false` |
 
 `$comment` is ignored. Any other key, a malformed file, or a GitHub error
 holds the merge rather than passing it. A repository without the file is
@@ -37,10 +38,12 @@ folder. If it can't, it asks GitHub again for fewer files at a time (100,
 20, 5, then 1). If one file's diff is still too large, the merge is held,
 naming the file's position in the pull request.
 
-Two paths are always held: `.claude/ship-gate.json` and
-`.claude/skills/ship-gate/`. The rules are read from the base branch, not
-from the pull request, so a pull request can't loosen the gate it is merged
-through, and a change to the gate itself always waits for a person.
+`.claude/ship-gate.json` is always held, so a change to the rules always
+waits for a person. The gate's code under `.claude/skills/ship-gate/` is held
+too, unless the rules set `"holdGateCode": false`; then a fix to the gate's
+code merges like any other change. The rules are read from the base branch,
+not from the pull request, so a pull request can't loosen the gate it is
+merged through.
 
 ## Where it runs
 
