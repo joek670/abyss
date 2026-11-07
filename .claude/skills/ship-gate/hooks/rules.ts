@@ -3,9 +3,11 @@
 
 export const CONFIG_PATH = '.claude/ship-gate.json'
 
-// Held in every repository that opts in: the gate's own rules and code, so
-// only a person can loosen them.
-const ALWAYS_HELD = [CONFIG_PATH, '.claude/skills/ship-gate/']
+// The gate's rules file is held in every repository that opts in, so only a
+// person can loosen the rules. Its code is held too, unless the rules say
+// `"holdGateCode": false`; that setting can only arrive in a merge a person
+// makes, since the rules file itself is always held.
+const GATE_CODE = '.claude/skills/ship-gate/'
 
 const PASSING = new Set(['success', 'neutral', 'skipped'])
 
@@ -14,6 +16,7 @@ export type Config = {
   holdPaths: string[]
   holdAddedLines: { name: string; pattern: RegExp }[]
   requireGreenChecks: boolean
+  holdGateCode: boolean
 }
 
 export type PullRequestFile = {
@@ -34,18 +37,20 @@ const isStringList = (v: unknown): v is string[] =>
 export function parseConfig(text: string): Config {
   const raw: unknown = JSON.parse(text)
   if (!isRecord(raw)) throw new Error(`${CONFIG_PATH} is not a JSON object`)
-  const known = ['$comment', 'holdDeletions', 'holdPaths', 'holdAddedLines', 'requireGreenChecks']
+  const known = ['$comment', 'holdDeletions', 'holdPaths', 'holdAddedLines', 'requireGreenChecks', 'holdGateCode']
   for (const key of Object.keys(raw)) {
     if (!known.includes(key)) throw new Error(`${CONFIG_PATH} has an unknown key "${key}"`)
   }
-  const { holdDeletions = false, holdPaths = [], holdAddedLines = [], requireGreenChecks = false } = raw
+  const { holdDeletions = false, holdPaths = [], holdAddedLines = [], requireGreenChecks = false, holdGateCode = true } = raw
   if (typeof holdDeletions !== 'boolean') throw new Error('holdDeletions is not true or false')
+  if (typeof holdGateCode !== 'boolean') throw new Error('holdGateCode is not true or false')
   if (typeof requireGreenChecks !== 'boolean') throw new Error('requireGreenChecks is not true or false')
   if (!isStringList(holdPaths)) throw new Error('holdPaths is not a list of paths')
   if (!Array.isArray(holdAddedLines)) throw new Error('holdAddedLines is not a list')
   return {
     holdDeletions,
     requireGreenChecks,
+    holdGateCode,
     holdPaths,
     holdAddedLines: holdAddedLines.map(entry => {
       if (!isRecord(entry) || typeof entry.name !== 'string' || typeof entry.pattern !== 'string') {
@@ -62,7 +67,7 @@ const heldBy = (path: string, rules: readonly string[]) =>
   rules.find(rule => (rule.endsWith('/') ? path.startsWith(rule) : path === rule))
 
 export function reasonsFromFiles(config: Config, files: readonly PullRequestFile[]): string[] {
-  const rules = [...ALWAYS_HELD, ...config.holdPaths]
+  const rules = [CONFIG_PATH, ...(config.holdGateCode ? [GATE_CODE] : []), ...config.holdPaths]
   const reasons: string[] = []
   for (const file of files) {
     if (config.holdDeletions && file.status === 'removed') reasons.push(`deletes ${file.filename}`)
