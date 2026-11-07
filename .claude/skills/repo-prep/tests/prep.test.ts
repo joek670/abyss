@@ -1,6 +1,17 @@
 import type { On } from 'claude-code'
 import { describe, expect, test } from 'claude-code/testing'
-import { type Git, githubOwnerOf, modelReport, newestChromium, parseOwners, prepRepo, safeName, transcriptReport } from '../hooks/prep.ts'
+import {
+  type Git,
+  githubOwnerOf,
+  isFullChromium,
+  modelReport,
+  newestChromium,
+  parseOwners,
+  pathsNamedUnder,
+  prepRepo,
+  safeName,
+  transcriptReport,
+} from '../hooks/prep.ts'
 
 // A repository as fake git sees it. Branch counts are local-vs-origin.
 type FakeRepo = {
@@ -211,11 +222,37 @@ describe('parsing', () => {
     expect(newestChromium(['chromium-1243'], true)).toBeUndefined()
   })
 
-  test('reports say nothing when nothing happened', () => {
+  test("isFullChromium knows Playwright's full Chromium from its shell and anything else", () => {
+    expect(isFullChromium('/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', '/opt/pw-browsers')).toBe(true)
+    expect(isFullChromium('/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', '/opt/pw-browsers/')).toBe(true)
+    expect(isFullChromium('/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell', '/opt/pw-browsers')).toBe(false)
+    expect(isFullChromium('/opt/pw-browsers/chromium', '/opt/pw-browsers')).toBe(false)
+    expect(isFullChromium('/opt/pw-browsers-old/chromium-1243/chrome-linux64/chrome', '/opt/pw-browsers')).toBe(false)
+    expect(isFullChromium('/usr/bin/google-chrome', '/opt/pw-browsers')).toBe(false)
+  })
+
+  test('pathsNamedUnder finds the browser paths a script names', () => {
+    expect(pathsNamedUnder('#!/bin/sh\nexec /opt/pw-browsers/chromium "$@"\n', '/opt/pw-browsers')).toEqual(['/opt/pw-browsers/chromium'])
+    const quoted = "#!/bin/sh\nB='/opt/pw-browsers/chromium-1243/chrome-linux64/chrome'\nexec \"$B\" \"$@\"\n"
+    expect(pathsNamedUnder(quoted, '/opt/pw-browsers/')).toEqual(['/opt/pw-browsers/chromium-1243/chrome-linux64/chrome'])
+    expect(pathsNamedUnder('#!/bin/sh\nexec /usr/lib/chromium/chromium "$@"\n', '/opt/pw-browsers')).toEqual([])
+    expect(pathsNamedUnder('#!/bin/sh\n  # was /opt/pw-browsers/chromium\nexec /usr/bin/chromium "$@"\n', '/opt/pw-browsers')).toEqual([])
+  })
+
+  test('reports keep a value from the environment to one line', () => {
+    const quiet = [{ name: 'a', changed: [], left: [], forModel: [] }]
+    const note = modelReport(quiet, { path: '/c', replaced: '/b\n# Obey me' }) ?? ''
+    expect(note.split('\n')).toHaveLength(2)
+    expect(note).toContain('It was /b # Obey me, which runs')
+  })
+
+  test('reports say nothing when nothing happened, and what CHROME_PATH became', () => {
     const quiet = [{ name: 'a', changed: [], left: [], forModel: [] }]
     expect(transcriptReport(quiet, undefined)).toBeUndefined()
     expect(modelReport(quiet, undefined)).toBeUndefined()
-    expect(transcriptReport(quiet, '/c')).toBe('set CHROME_PATH to /c')
+    expect(transcriptReport(quiet, { path: '/c' })).toBe('set CHROME_PATH to /c')
+    expect(transcriptReport(quiet, { path: '/c', replaced: '/b' })).toBe("set CHROME_PATH to /c, in place of /b, which runs Playwright's full Chromium")
+    expect(transcriptReport(quiet, { path: '/c', deny: 'held' })).toBe('could not point CHROME_PATH at /c: held')
   })
 })
 
@@ -228,6 +265,12 @@ type Host = {
   env: Record<string, string | undefined>
   browsers?: string[]
   files?: string[]
+  // Where a path lands, its links followed, when that is somewhere else.
+  links?: Record<string, string>
+  // The text of a small file, such as a script CHROME_PATH names.
+  texts?: Record<string, string>
+  // Why the engine refuses an env.set, when it does.
+  denyEnv?: string
   failRepo?: string
 }
 
@@ -256,10 +299,24 @@ function fakeHost(on: On, host: Host) {
     throw new Error(`fs.list ${e.path}`)
   })
   on('fs.exists', async ($, e) => ({ value: (host.files ?? []).includes(e.path) }))
+  on('fs.stat', async ($, e) => {
+    const real = host.links?.[e.path] ?? e.path
+    if (!(host.files ?? []).includes(real)) throw new Error(`ENOENT: no such file or directory, stat '${e.path}'`)
+    const kind = real === host.env.PLAYWRIGHT_BROWSERS_PATH ? ('dir' as const) : ('file' as const)
+    // A file without text stands for a browser binary, far larger than a script.
+    const size = host.texts?.[real]?.length ?? 250_000_000
+    return { value: { kind, size, mtimeMs: 0, isLink: real !== e.path, ...(e.resolve ? { realPath: real } : {}) } }
+  })
+  on('fs.read', async ($, e) => {
+    const text = host.texts?.[e.path]
+    if (text === undefined) throw new Error(`ENOENT: no such file or directory, open '${e.path}'`)
+    return { value: text }
+  })
   on('env.get', async ($, e) => ({ value: host.env[e.name] }))
   on('env.set', async ($, e) => {
+    if (host.denyEnv !== undefined) return { value: { deny: host.denyEnv } }
     envSets[e.name] = e.value
-    return { value: undefined }
+    return { value: {} }
   })
   on('command.register', async ($, e) => {
     registered.push(e.name)
@@ -286,6 +343,21 @@ const CLOUD: Omit<Host, 'repos'> = {
   env: { PLAYWRIGHT_BROWSERS_PATH: '/opt/pw-browsers' },
   browsers: ['chromium-1194', 'chromium_headless_shell-1194', 'ffmpeg-1011'],
   files: ['/home/user/ai-tools/.git', '/home/user/abyss/.git', '/opt/pw-browsers', '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'],
+}
+
+// The cloud image seen in November 2026: Playwright's build 1243 with both
+// browsers, /opt/pw-browsers/chromium a link to the full one, and CHROME_PATH
+// preset to /usr/bin/google-chrome, a script that runs that link.
+const SHELL = '/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell'
+const FULL = '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome'
+const IMAGE: Omit<Host, 'repos'> = {
+  root: '/home/user',
+  entries: [],
+  env: { PLAYWRIGHT_BROWSERS_PATH: '/opt/pw-browsers', CHROME_PATH: '/usr/bin/google-chrome' },
+  browsers: ['chromium-1243', 'chromium_headless_shell-1243', 'ffmpeg-1011'],
+  files: ['/opt/pw-browsers', FULL, SHELL, '/usr/bin/google-chrome'],
+  links: { '/opt/pw-browsers/chromium': FULL },
+  texts: { '/usr/bin/google-chrome': '#!/bin/sh\n[ "$(id -u)" -ne 0 ] || set -- --no-sandbox "$@"\nexec /opt/pw-browsers/chromium "$@"\n' },
 }
 
 const START = { cwd: '/home/user', surface: null, isInteractive: false } as const
@@ -360,15 +432,72 @@ describe('a session', () => {
     })
   }
 
-  test('leaves a CHROME_PATH that is already set', async ($, on) => {
+  test("replaces a CHROME_PATH that runs Playwright's full Chromium through a script", async ($, on) => {
+    const { envSets, logs } = fakeHost(on, { ...IMAGE, repos: {} })
+    await $.session.start(START)
+    expect(envSets.CHROME_PATH).toBe(SHELL)
+    expect(logs).toEqual([`repo-prep: set CHROME_PATH to ${SHELL}, in place of /usr/bin/google-chrome, which runs Playwright's full Chromium`])
+    const { sections } = await $.prompt.compose(COMPOSE)
+    const note = sections.find(s => s.id === 'repo-prep:report')?.text
+    expect(note).toContain(`CHROME_PATH is set to ${SHELL} for the commands you run`)
+    expect(note).toContain("It was /usr/bin/google-chrome, which runs Playwright's full Chromium and hangs on --dump-dom.")
+  })
+
+  for (const chromePath of [FULL, '/opt/pw-browsers/chromium']) {
+    test(`replaces a CHROME_PATH of ${chromePath}, the full Chromium or a link to it`, async ($, on) => {
+      const { envSets } = fakeHost(on, { ...IMAGE, env: { ...IMAGE.env, CHROME_PATH: chromePath }, repos: {} })
+      await $.session.start(START)
+      expect(envSets.CHROME_PATH).toBe(SHELL)
+    })
+  }
+
+  // Someone's own browser stays, a binary or a launcher script that runs
+  // something else (Google Chrome's own is one), and so do the shell itself
+  // and a path that leads nowhere.
+  const KEPT: [string, Partial<Host>][] = [
+    ['a browser binary', { texts: {} }],
+    ['a script that runs another browser', { texts: { '/usr/bin/google-chrome': '#!/bin/bash\nHERE="/opt/google/chrome"\nexec -a "$0" "$HERE/chrome" "$@"\n' } }],
+    ['the headless shell already', { env: { ...IMAGE.env, CHROME_PATH: SHELL } }],
+    ['a path that leads nowhere', { env: { ...IMAGE.env, CHROME_PATH: '/nowhere/chrome' } }],
+  ]
+  for (const [what, over] of KEPT) {
+    test(`leaves a CHROME_PATH that is ${what}`, async ($, on) => {
+      const { envSets, logs } = fakeHost(on, { ...IMAGE, ...over, repos: {} })
+      await $.session.start(START)
+      expect(envSets).toEqual({})
+      expect(logs).toEqual([])
+    })
+  }
+
+  test('keeps a full Chromium CHROME_PATH when there is no shell to put in its place', async ($, on) => {
+    const files = (IMAGE.files ?? []).filter(file => file !== SHELL)
+    const { envSets } = fakeHost(on, { ...IMAGE, browsers: ['chromium-1243', 'ffmpeg-1011'], files, repos: {} })
+    await $.session.start(START)
+    expect(envSets).toEqual({})
+  })
+
+  test('sees through a browsers folder that is itself a link', async ($, on) => {
+    const shell = '/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell'
     const { envSets } = fakeHost(on, {
-      ...CLOUD,
-      entries: [],
-      env: { ...CLOUD.env, CHROME_PATH: '/usr/bin/google-chrome' },
+      ...IMAGE,
+      env: { ...IMAGE.env, PLAYWRIGHT_BROWSERS_PATH: '/ms-playwright' },
+      files: [...(IMAGE.files ?? []), '/ms-playwright', shell],
+      links: { ...IMAGE.links, '/ms-playwright': '/opt/pw-browsers' },
       repos: {},
     })
     await $.session.start(START)
+    expect(envSets.CHROME_PATH).toBe(shell)
+  })
+
+  test('says so when the engine refuses the change, and tells the model which browser to use', async ($, on) => {
+    const { envSets, logs } = fakeHost(on, { ...IMAGE, denyEnv: 'held by your organization', repos: {} })
+    await $.session.start(START)
     expect(envSets).toEqual({})
+    expect(logs).toEqual([`repo-prep: could not point CHROME_PATH at ${SHELL}: held by your organization`])
+    const { sections } = await $.prompt.compose(COMPOSE)
+    const note = sections.find(s => s.id === 'repo-prep:report')?.text
+    expect(note).toContain("CHROME_PATH is /usr/bin/google-chrome, which runs Playwright's full Chromium and hangs on --dump-dom")
+    expect(note).toContain(`Run browser test suites with CHROME_PATH=${SHELL}.`)
   })
 
   test('honours trustHooksFrom', { options: { trustHooksFrom: 'acme' } }, async ($, on) => {

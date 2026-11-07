@@ -21,28 +21,31 @@ wrong:
   only as a fast forward, and git refuses it for a branch checked out in any
   worktree. A diverged branch is never touched. It uses the remote-tracking
   ref as it stands and fetches nothing.
-- **Browser tests can't find Chrome in a cloud session.** Where
-  `CHROME_PATH` is unset and `PLAYWRIGHT_BROWSERS_PATH` names a folder with
-  Playwright's Chromium (`/opt/pw-browsers` in a cloud session), it sets
-  `CHROME_PATH` for every command the session runs. It picks the newest
-  headless shell (`chromium_headless_shell-N/.../chrome-headless-shell`, or
-  an older Playwright's `.../chrome-linux/headless_shell`) first: in build
-  1243, full Chromium's `--headless=new --dump-dom` hangs until killed when
-  it gets a fresh `--user-data-dir`, as test runners give it, while the
-  shell answers in under a second. Without a shell it falls back to the
-  newest `chromium-N/chrome-linux*/chrome`. `joek670/abyss`'s browser
-  suites need it.
+- **Browser tests can't find a Chrome that works in a cloud session.** Where
+  `PLAYWRIGHT_BROWSERS_PATH` names a folder with Playwright's Chromium
+  (`/opt/pw-browsers` in a cloud session), it points `CHROME_PATH` at the
+  newest headless shell (`chromium_headless_shell-N/.../chrome-headless-shell`,
+  or an older Playwright's `.../chrome-linux/headless_shell`) for every
+  command the session runs. In build 1243, full Chromium's `--headless=new
+  --dump-dom` hangs until killed when it gets a fresh `--user-data-dir`, as
+  test runners give it, while the shell answers in under a second.
 
-  It never replaces a `CHROME_PATH` that is already set, and the cloud
-  image seen in November 2026 sets one: `/usr/bin/google-chrome`, a wrapper
-  that runs full Chromium. There repo-prep leaves `CHROME_PATH` alone, so a
-  session has to point it at the shell itself; abyss's `CLAUDE.md` gives
-  the command.
+  It does that when `CHROME_PATH` is unset, and in place of a `CHROME_PATH`
+  that runs Playwright's full Chromium: that binary, a link to it, or a
+  script of up to 64 KiB that names either. The cloud image seen in
+  November 2026 sets `CHROME_PATH=/usr/bin/google-chrome`, a script that
+  runs `exec /opt/pw-browsers/chromium "$@"`, a link to the full Chromium,
+  so there it puts the shell in its place. Any other `CHROME_PATH`, such as
+  a Chrome of your own, stays as it is. Without a shell, an unset
+  `CHROME_PATH` gets the newest `chromium-N/chrome-linux*/chrome`, and a set
+  one stays. `joek670/abyss`'s browser suites need it.
 
 It says what it did in one transcript line, and tells the model in a short
-system-prompt section only what changes how it works (hooks are on, or
-compare against `origin/<b>`). `/repo-prep` runs it again and replies with
-what it did.
+system-prompt section only what changes how it works (hooks are on, compare
+against `origin/<b>`, or which `CHROME_PATH` its commands get). Where the
+engine refuses to change `CHROME_PATH` (an organization's settings can hold
+it), the line says so, and the model is told which `CHROME_PATH` to run
+browser tests with. `/repo-prep` runs it again and replies with what it did.
 
 A session started inside a repository prepares that repository. A session
 started above several clones (a cloud session with more than one
@@ -60,10 +63,11 @@ hooks repo-prep turns on. Set it with
 
 `claude plugin validate` lists it as: hooks `session.start`,
 `command.run{command=repo-prep}`, `prompt.compose`; calls `$.process.run`
-(git only), `$.fs.list` and `$.fs.exists`, `$.env.get` and `$.env.set`
-(`CHROME_PATH`, `PLAYWRIGHT_BROWSERS_PATH`), `$.session.root`,
-`$.command.register`, `$.ui.log`. No network, no model calls, no tool-call
-gates.
+(git only), `$.fs.list` and `$.fs.exists`, `$.fs.stat` and `$.fs.read`
+(where `CHROME_PATH` leads, and a script's text up to 64 KiB), `$.env.get`
+(`CHROME_PATH`, `PLAYWRIGHT_BROWSERS_PATH`) and `$.env.set`
+(`CHROME_PATH`), `$.session.root`, `$.command.register`, `$.ui.log`. No
+network, no model calls, no tool-call gates.
 
 ## Where it runs
 
