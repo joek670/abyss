@@ -29,6 +29,14 @@ which is what `CLAUDE.md` asks for. The merge then waits for you on GitHub.
 holds the merge rather than passing it. A repository without the file is
 not gated.
 
+A large pull request is still checked in full. When GitHub's answer is
+bigger than one tool result may be, Claude Code hands the gate a notice
+instead ("exceeds maximum allowed tokens") and saves the whole answer to a
+file in the session's `tool-results` folder; the gate reads that file (up to
+4 MiB, and only from a `tool-results` folder). If the copy can't be read, it
+asks for the file list again in smaller pages, down to one file a page. Only
+when not even one file can be read does it hold the merge, saying so.
+
 Two paths are always held: `.claude/ship-gate.json` and
 `.claude/skills/ship-gate/`. The rules are read from the base branch, not
 from the pull request, so a pull request can't loosen the gate it is merged

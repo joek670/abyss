@@ -22,6 +22,26 @@ const MERGE_TOOL = /^mcp__(.+)__(merge_pull_request|enable_pr_auto_merge)$/
 // GitHub serves a pull request's files 100 a page and 3000 in all.
 const PER_PAGE = 100
 const MAX_PAGES = 30
+const MAX_FILES = 3000
+
+// The file list's page sizes, largest first, for a page too large to read
+// even from its saved copy (below). Each divides the one before, so the files
+// read so far always end on a page boundary of the next size.
+const PAGE_SIZES = [100, 50, 25, 5, 1]
+
+// The engine hands a hook the result the model would get. One too large for a
+// single result comes back as a notice instead, "Error: result (412,809
+// characters across 1 line) exceeds maximum allowed tokens. Output has been
+// saved to <path>.", with the whole result in that file, under the session's
+// tool-results folder. A large pull request's files are read from there:
+// refusing them for their size held every large merge. Only a file in a
+// tool-results folder is read, and what it holds must still be valid JSON of
+// the shape asked for.
+const OVERSIZED = /exceeds maximum allowed tokens/i
+const SAVED_COPY = /saved to (.+?[\\/]tool-results[\\/][^\\/\r\n]+?\.(?:txt|json))(?=\.?\s|\.?$)/
+
+// A result too large to read: the file list asks again in smaller pages.
+class TooLarge extends Error {}
 
 // The refusal lists this many reasons, then counts the rest.
 const MAX_LISTED = 8
@@ -57,11 +77,28 @@ function configTextOf(blocks: readonly Record<string, unknown>[]): string | unde
   return undefined
 }
 
+async function parseResult($: EngineInterface, text: string, tool: string): Promise<unknown> {
+  try {
+    return JSON.parse(text) as unknown
+  } catch (error) {
+    const saved = SAVED_COPY.exec(text)?.[1]
+    if (saved !== undefined) {
+      try {
+        return JSON.parse(await $.fs.read(saved)) as unknown
+      } catch {
+        throw new TooLarge(`GitHub ${tool} returned more than one result can carry, and its saved copy could not be read`)
+      }
+    }
+    if (OVERSIZED.test(text)) throw new TooLarge(`GitHub ${tool} returned more than one result can carry, and no copy of it was saved`)
+    throw error
+  }
+}
+
 async function githubJson($: EngineInterface, at: Repo, tool: string, args: Record<string, unknown>) {
   const result = await $.mcp.call(at.server, tool, { owner: at.owner, repo: at.repo, ...args })
   const text = textOf(result.content)
   if (result.isError) throw new Error(`GitHub ${tool} failed: ${text.slice(0, 200)}`)
-  return JSON.parse(text) as unknown
+  return parseResult($, text, tool)
 }
 
 // The config on the base branch, or undefined when the repository has none.
@@ -84,11 +121,28 @@ async function readConfig($: EngineInterface, at: Repo, base: string): Promise<C
 
 async function listFiles($: EngineInterface, at: Repo, pullNumber: number) {
   const files: PullRequestFile[] = []
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const batch = await githubJson($, at, 'pull_request_read', { method: 'get_files', pullNumber, perPage: PER_PAGE, page })
+  let size = 0
+  while (files.length < MAX_FILES) {
+    const perPage = PAGE_SIZES[size] ?? 1
+    let batch: unknown
+    try {
+      batch = await githubJson($, at, 'pull_request_read', {
+        method: 'get_files',
+        pullNumber,
+        perPage,
+        page: files.length / perPage + 1,
+      })
+    } catch (error) {
+      if (error instanceof TooLarge && size < PAGE_SIZES.length - 1) {
+        size++
+        continue
+      }
+      throw error
+    }
     if (!Array.isArray(batch)) throw new Error('GitHub get_files did not return a list')
+    if (batch.length > perPage) throw new Error('GitHub get_files returned more files than a page holds')
     files.push(...(batch as PullRequestFile[]))
-    if (batch.length < PER_PAGE) break
+    if (batch.length < perPage) break
   }
   return files
 }
