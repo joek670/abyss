@@ -57,11 +57,37 @@ function configTextOf(blocks: readonly Record<string, unknown>[]): string | unde
   return undefined
 }
 
+// A result too large to show a tool reaches the hook as this notice, not as
+// the result: "Error: result (224,572 characters across 1 line) exceeds
+// maximum allowed tokens. Output has been saved to <path>." The saved file
+// holds the result's text as the server sent it. Reading the notice as JSON
+// is what held every pull request with a large diff.
+const OVERSIZED = /^Error: result \([^)]*\) exceeds maximum allowed tokens\. Output has been saved to (\S+?)\.?(?=\s|$)/
+
+// The answer was too large to pass on and its saved copy could not be read.
+// listFiles asks again for fewer files at a time; anywhere else it holds.
+class TooLarge extends Error {}
+
+async function resultText($: EngineInterface, tool: string, content: readonly { type: string; text?: string }[]) {
+  const text = textOf(content)
+  const saved = OVERSIZED.exec(text)
+  if (saved === null) return text
+  const path = saved[1] ?? ''
+  const unread = `GitHub ${tool} answered with more than this session passes on, and its saved copy could not be read`
+  // Only the session's own saved tool results: an absolute path whose folder
+  // is tool-results. Any other path the text names is not opened.
+  if (!/^(\/|[A-Za-z]:[\\/])/.test(path) || !/[\\/]tool-results[\\/][^\\/]+$/.test(path)) throw new TooLarge(unread)
+  try {
+    return String(await $.fs.read(path))
+  } catch {
+    throw new TooLarge(unread)
+  }
+}
+
 async function githubJson($: EngineInterface, at: Repo, tool: string, args: Record<string, unknown>) {
   const result = await $.mcp.call(at.server, tool, { owner: at.owner, repo: at.repo, ...args })
-  const text = textOf(result.content)
-  if (result.isError) throw new Error(`GitHub ${tool} failed: ${text.slice(0, 200)}`)
-  return JSON.parse(text) as unknown
+  if (result.isError) throw new Error(`GitHub ${tool} failed: ${textOf(result.content).slice(0, 200)}`)
+  return JSON.parse(await resultText($, tool, result.content)) as unknown
 }
 
 // The config on the base branch, or undefined when the repository has none.
@@ -82,12 +108,36 @@ async function readConfig($: EngineInterface, at: Repo, base: string): Promise<C
   return parseConfig(text)
 }
 
+// Page sizes to fall back through when a page is too large to read. Each
+// divides the one before, so a smaller page always starts on a whole page.
+const SMALLER_PAGES = [PER_PAGE, 20, 5, 1]
+
+// The files from `offset`, `size` at a time: one page, or, when that page is
+// too large to read, the same files in smaller pages.
+async function filesFrom($: EngineInterface, at: Repo, pullNumber: number, offset: number, size: number): Promise<PullRequestFile[]> {
+  try {
+    const batch = await githubJson($, at, 'pull_request_read', { method: 'get_files', pullNumber, perPage: size, page: offset / size + 1 })
+    if (!Array.isArray(batch)) throw new Error('GitHub get_files did not return a list')
+    return batch as PullRequestFile[]
+  } catch (error) {
+    if (!(error instanceof TooLarge)) throw error
+    const smaller = SMALLER_PAGES[SMALLER_PAGES.indexOf(size) + 1]
+    if (smaller === undefined) throw new Error(`file ${offset + 1} of the pull request has a diff too large for ship-gate to read`)
+    const files: PullRequestFile[] = []
+    for (let start = offset; start < offset + size; start += smaller) {
+      const batch = await filesFrom($, at, pullNumber, start, smaller)
+      files.push(...batch)
+      if (batch.length < smaller) break
+    }
+    return files
+  }
+}
+
 async function listFiles($: EngineInterface, at: Repo, pullNumber: number) {
   const files: PullRequestFile[] = []
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const batch = await githubJson($, at, 'pull_request_read', { method: 'get_files', pullNumber, perPage: PER_PAGE, page })
-    if (!Array.isArray(batch)) throw new Error('GitHub get_files did not return a list')
-    files.push(...(batch as PullRequestFile[]))
+    const batch = await filesFrom($, at, pullNumber, (page - 1) * PER_PAGE, PER_PAGE)
+    files.push(...batch)
     if (batch.length < PER_PAGE) break
   }
   return files
