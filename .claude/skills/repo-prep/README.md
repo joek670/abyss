@@ -25,10 +25,19 @@ wrong:
   `CHROME_PATH` is unset and `PLAYWRIGHT_BROWSERS_PATH` names a folder with
   Playwright's Chromium (`/opt/pw-browsers` in a cloud session), it sets
   `CHROME_PATH` for every command the session runs. It picks the newest
-  headless shell (`chromium_headless_shell-N/.../chrome-headless-shell`)
-  first, since from build 1243 full Chromium's `--headless=new --dump-dom`
-  hangs until killed. Without a shell it falls back to the newest
-  `chromium-N/chrome-linux*/chrome`. `joek670/abyss`'s browser suites need it.
+  headless shell (`chromium_headless_shell-N/.../chrome-headless-shell`, or
+  an older Playwright's `.../chrome-linux/headless_shell`) first: in build
+  1243, full Chromium's `--headless=new --dump-dom` hangs until killed when
+  it gets a fresh `--user-data-dir`, as test runners give it, while the
+  shell answers in under a second. Without a shell it falls back to the
+  newest `chromium-N/chrome-linux*/chrome`. `joek670/abyss`'s browser
+  suites need it.
+
+  It never replaces a `CHROME_PATH` that is already set, and the cloud
+  image seen in November 2026 sets one: `/usr/bin/google-chrome`, a wrapper
+  that runs full Chromium. There repo-prep leaves `CHROME_PATH` alone, so a
+  session has to point it at the shell itself; abyss's `CLAUDE.md` gives
+  the command.
 
 It says what it did in one transcript line, and tells the model in a short
 system-prompt section only what changes how it works (hooks are on, or

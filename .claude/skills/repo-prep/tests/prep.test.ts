@@ -340,6 +340,26 @@ describe('a session', () => {
     expect(envSets.CHROME_PATH).toBe(shell)
   })
 
+  // Where else Playwright keeps the shell: Linux arm64 in 1.63, every Linux
+  // build in 1.49. A plain `-linux` folder is looked for too.
+  for (const shell of [
+    '/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux-arm64/chrome-headless-shell',
+    '/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux/chrome-headless-shell',
+    '/opt/pw-browsers/chromium_headless_shell-1148/chrome-linux/headless_shell',
+  ]) {
+    test(`finds the headless shell at ${shell.split('/').slice(3).join('/')}`, async ($, on) => {
+      const { envSets } = fakeHost(on, {
+        ...CLOUD,
+        entries: [],
+        repos: {},
+        browsers: ['chromium-1243', shell.split('/')[3] ?? ''],
+        files: ['/opt/pw-browsers', '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', shell],
+      })
+      await $.session.start(START)
+      expect(envSets.CHROME_PATH).toBe(shell)
+    })
+  }
+
   test('leaves a CHROME_PATH that is already set', async ($, on) => {
     const { envSets } = fakeHost(on, {
       ...CLOUD,

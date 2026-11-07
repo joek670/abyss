@@ -8,11 +8,16 @@ stop at "pushed" and wait to be told to open or merge a pull request.
 1. Run `npm run check:all` locally first. It covers what CI runs, and there
    is nothing to install. In a cloud session the browser suites need
    `CHROME_PATH` pointed at Playwright's headless shell
-   (`/opt/pw-browsers/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell`;
-   full Chromium's `chrome` hangs on `--dump-dom`); the `repo-prep` mod
-   (`.claude/skills/repo-prep/`) sets it when it is loaded. Without it they
-   print `No Chrome or Edge binary found` and exit, which is a failure, not a
-   pass.
+   (`/opt/pw-browsers/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell`).
+   Full Chromium hangs there on `--dump-dom`, so every page fails with
+   `missing text` after a 120-second timeout, and the cloud image sets
+   `CHROME_PATH=/usr/bin/google-chrome`, which runs full Chromium. The
+   `repo-prep` mod (`.claude/skills/repo-prep/`) sets `CHROME_PATH` only
+   when it is unset, so if `echo "$CHROME_PATH"` shows anything but the
+   shell, run
+   `CHROME_PATH="$(ls -d /opt/pw-browsers/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell | sort -V | tail -n 1)" npm run check:all`.
+   With no Chrome at all they print `No Chrome or Edge binary found` and
+   exit, which is a failure, not a pass.
 2. Commit on the session's branch with a clear message, and push it.
 3. Open a pull request into `main`, or update the one already open for the
    branch.

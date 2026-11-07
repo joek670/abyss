@@ -7,9 +7,9 @@ import { type Git, modelReport, newestChromium, parseOwners, prepRepo, safeName,
 //   in trustHooksFrom, since a fresh clone leaves them off;
 // - fast-forwards a stale local default branch to origin's, so a diff
 //   against it shows only the branch's own changes;
-// - points CHROME_PATH at Playwright's headless shell (or else Chromium)
-//   where the environment has
-//   one (a cloud session) and nothing set it.
+// - points CHROME_PATH at Playwright's headless shell, or else its full
+//   Chromium, where the environment has one (a cloud session) and nothing
+//   set it.
 // It tells the person in one transcript line and the model in a short
 // system-prompt section, and /repo-prep runs it again.
 
@@ -48,10 +48,17 @@ async function findRepos($: EngineInterface): Promise<string[]> {
 
 // Playwright's Chromium, for CHROME_PATH, when it is unset and the
 // environment names a Playwright browsers folder that holds one. The headless
-// shell comes first: from build 1243 the full Chromium's `--headless=new
-// --dump-dom` hangs until killed, while the shell answers in under a second.
+// shell comes first: in build 1243 the full Chromium's `--headless=new
+// --dump-dom` hangs until killed when it gets a fresh --user-data-dir, as
+// test runners give it, while the shell answers in under a second.
+// Playwright 1.63 keeps the shell in chrome-headless-shell-linux64 (x64) or
+// chrome-headless-shell-linux-arm64; 1.49 kept it in chrome-linux.
 const CANDIDATES: ReadonlyArray<{ headlessShell: boolean; builds: string[]; binary: string }> = [
-  { headlessShell: true, builds: ['chrome-headless-shell-linux64', 'chrome-headless-shell-linux'], binary: 'chrome-headless-shell' },
+  {
+    headlessShell: true,
+    builds: ['chrome-headless-shell-linux64', 'chrome-headless-shell-linux-arm64', 'chrome-headless-shell-linux'],
+    binary: 'chrome-headless-shell',
+  },
   { headlessShell: true, builds: ['chrome-linux'], binary: 'headless_shell' },
   { headlessShell: false, builds: ['chrome-linux', 'chrome-linux64'], binary: 'chrome' },
 ]
