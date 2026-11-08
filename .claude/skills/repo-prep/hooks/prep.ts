@@ -73,6 +73,31 @@ export function newestChromium(names: readonly string[], headlessShell = false):
     .sort((a, b) => Number(b.build) - Number(a.build))[0]?.name
 }
 
+// Whether `path`, its links already followed, is in one of Playwright's full
+// Chromium folders (chromium-1243/...) under `browsers`: not the headless
+// shell, and nothing outside the folder.
+export function isFullChromium(path: string, browsers: string): boolean {
+  const base = browsers.replace(/[\\/]+$/, '')
+  return path.startsWith(base) && /^[\\/]chromium-\d+[\\/]/.test(path.slice(base.length))
+}
+
+// The paths under `browsers` that a script's text names, such as the
+// /opt/pw-browsers/chromium in `exec /opt/pw-browsers/chromium "$@"`. Comment
+// lines don't count: a path a script only mentions there is not one it runs.
+// $PLAYWRIGHT_BROWSERS_PATH counts as `browsers`, and with `scriptDir` the
+// script's own folder ($(dirname "$0"), ${0%/*}) as that folder.
+export function pathsNamedUnder(text: string, browsers: string, scriptDir?: string): string[] {
+  const root = browsers.replace(/[\\/]+$/, '')
+  const base = root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const code = text
+    .split('\n')
+    .filter(line => !line.trimStart().startsWith('#'))
+    .join('\n')
+    .replace(/\$\{PLAYWRIGHT_BROWSERS_PATH\}|\$PLAYWRIGHT_BROWSERS_PATH\b/g, () => root)
+    .replace(/\$\(dirname (?:-- )?"?\$0"?\)|`dirname (?:-- )?"?\$0"?`|\$\{0%\/\*\}/g, match => scriptDir ?? match)
+  return [...new Set(code.match(new RegExp(`${base}[\\\\/][^\\s"'\`;&|()<>$]+`, 'g')) ?? [])]
+}
+
 async function turnOnHooks(git: Git, owner: string | undefined, trusted: ReadonlySet<string>, out: RepoResult) {
   const tracked = await git(['ls-files', '-s', '--', HOOKS_DIR])
   if (tracked.exitCode !== 0 || tracked.stdout.trim() === '') return
@@ -172,19 +197,82 @@ export async function prepRepo(git: Git, name: string, trusted: ReadonlySet<stri
   return out
 }
 
+// The variables browser test runners read for the browser to start:
+// CHROME_PATH (chrome-launcher, Lighthouse, abyss), CHROME_BIN (Karma),
+// PUPPETEER_EXECUTABLE_PATH (Puppeteer).
+export type BrowserVariable = 'CHROME_PATH' | 'CHROME_BIN' | 'PUPPETEER_EXECUTABLE_PATH'
+
+// What repo-prep did to one of them: pointed it at `path`, in place of
+// `replaced` when that ran Playwright's full Chromium. `shell` is what `path`
+// runs when it is repo-prep's wrapper for the headless shell. With `deny`, the
+// engine refused the change and the variable is as it was.
+export type ChromeChange = { name: BrowserVariable; path: string; shell?: string; replaced?: string; deny?: string }
+
+const FULL_CHROMIUM = "Playwright's full Chromium"
+
+// A value from the environment or the engine, kept to one line of bounded
+// length before it reaches the transcript or the system prompt.
+const oneLine = (text: string) => text.replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, 300)
+
+const safeChange = ({ name, path, shell, replaced, deny }: ChromeChange): ChromeChange => ({
+  name,
+  path: oneLine(path),
+  ...(shell === undefined ? {} : { shell: oneLine(shell) }),
+  ...(replaced === undefined ? {} : { replaced: oneLine(replaced) }),
+  ...(deny === undefined ? {} : { deny: oneLine(deny) }),
+})
+
+// Changes that differ only in their variable, as one: the names listed
+// ("A, B and C"), whether there are several, and the change.
+type Alike = { names: string; many: boolean; change: ChromeChange }
+
+function alike(changes: readonly ChromeChange[]): Alike[] {
+  const groups = new Map<string, { list: string[]; change: ChromeChange }>()
+  for (const change of changes) {
+    const key = JSON.stringify([change.path, change.shell, change.replaced, change.deny])
+    const group = groups.get(key) ?? { list: [], change: safeChange(change) }
+    group.list.push(change.name)
+    groups.set(key, group)
+  }
+  return [...groups.values()].map(({ list, change }) => ({
+    names: list.length < 2 ? list.join('') : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`,
+    many: list.length > 1,
+    change,
+  }))
+}
+
+function chromeClause({ names, change: { path, shell, replaced, deny } }: Alike): string {
+  const to = shell === undefined ? path : `${path}, which runs ${shell} with --no-sandbox as root`
+  if (deny !== undefined) return `could not point ${names} at ${to}: ${deny}`
+  if (replaced !== undefined) return `set ${names} to ${to}, in place of ${replaced}, which runs ${FULL_CHROMIUM}`
+  return `set ${names} to ${to}`
+}
+
+function chromeNote({ names, many, change: { path, shell, replaced, deny } }: Alike): string {
+  const [is, them, they] = many ? ['are', 'them', 'They were'] : ['is', 'it', 'It was']
+  const to = shell === undefined ? path : `${path} (repo-prep's wrapper for ${shell}, adding --no-sandbox as root)`
+  const was = replaced === undefined ? '' : `${replaced}, which runs ${FULL_CHROMIUM} and hangs on --dump-dom`
+  if (deny !== undefined) {
+    const now = replaced === undefined ? `${names} ${is} unset` : `${names} ${is} ${was}`
+    return `- ${now}; repo-prep could not change ${them} (${deny}). Run browser test suites with ${names} set to ${to}.`
+  }
+  const before = replaced === undefined ? '' : ` ${they} ${was}.`
+  return `- ${names} ${is} set to ${to} for the commands you run, so browser test suites find Chromium.${before}`
+}
+
 // What happened, one clause per repository, for the transcript line and the
 // command's reply; undefined when nothing happened anywhere worth saying.
-export function transcriptReport(results: readonly RepoResult[], chrome: string | undefined): string | undefined {
+export function transcriptReport(results: readonly RepoResult[], chrome: readonly ChromeChange[]): string | undefined {
   const lines = results
     .filter(r => r.changed.length + r.left.length > 0)
     .map(r => `${r.name}: ${[...r.changed, ...r.left].join('; ')}`)
-  if (chrome !== undefined) lines.push(`set CHROME_PATH to ${chrome}`)
+  lines.push(...alike(chrome).map(chromeClause))
   return lines.length === 0 ? undefined : lines.join(' · ')
 }
 
 // The system-prompt section: only what changes how the model should work.
-export function modelReport(results: readonly RepoResult[], chrome: string | undefined): string | undefined {
+export function modelReport(results: readonly RepoResult[], chrome: readonly ChromeChange[]): string | undefined {
   const lines = results.flatMap(r => r.forModel.map(line => `- ${r.name}: ${line}`))
-  if (chrome !== undefined) lines.push(`- CHROME_PATH is set to ${chrome} for the commands you run, so browser test suites find Chromium.`)
+  lines.push(...alike(chrome).map(chromeNote))
   return lines.length === 0 ? undefined : ['# Repository prep (repo-prep mod)', ...lines].join('\n')
 }
