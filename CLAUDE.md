@@ -13,8 +13,9 @@ stop at "pushed" and wait to be told to open or merge a pull request.
    `missing text` after a 120-second timeout, and the cloud image sets
    `CHROME_PATH=/usr/bin/google-chrome`, which runs full Chromium. The
    `repo-prep` mod (`.claude/skills/repo-prep/`) puts the shell in its
-   place in sessions that load it. If `echo "$CHROME_PATH"` shows anything
-   but the shell, run
+   place in sessions that load it, through its wrapper
+   `~/.cache/repo-prep/chrome-headless-shell`. If `echo "$CHROME_PATH"`
+   shows neither the shell nor that wrapper, run
    `CHROME_PATH="$(ls -d /opt/pw-browsers/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell | sort -V | tail -n 1)" npm run check:all`.
    With no Chrome at all they print `No Chrome or Edge binary found` and
    exit, which is a failure, not a pass.

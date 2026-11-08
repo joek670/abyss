@@ -1,5 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 import {
+  type BrowserVariable,
   type ChromeChange,
   type Git,
   isFullChromium,
@@ -20,7 +21,8 @@ import {
 //   against it shows only the branch's own changes;
 // - points CHROME_PATH at Playwright's headless shell where the environment
 //   has one (a cloud session): when nothing set it (else at the full
-//   Chromium), or in place of a CHROME_PATH that runs the full Chromium.
+//   Chromium), or, through a wrapper of its own, in place of a CHROME_PATH,
+//   CHROME_BIN or PUPPETEER_EXECUTABLE_PATH that runs the full Chromium.
 // It tells the person in one transcript line and the model in a short
 // system-prompt section, and /repo-prep runs it again.
 
@@ -93,37 +95,103 @@ async function runsFullChromium($: EngineInterface, chromePath: string, browsers
   if (stat.kind !== 'file' || stat.size > MAX_SCRIPT_BYTES) return false
   const text = await $.fs.read(stat.realPath).catch(() => '')
   if (!text.startsWith('#!')) return false
-  for (const named of new Set([...pathsNamedUnder(text, browsers), ...pathsNamedUnder(text, base)])) {
+  // $0 is the path the script is run by, CHROME_PATH itself.
+  const cut = chromePath.lastIndexOf('/')
+  const dir = cut < 0 ? '.' : chromePath.slice(0, cut) || '/'
+  for (const named of new Set([...pathsNamedUnder(text, browsers, dir), ...pathsNamedUnder(text, base, dir)])) {
     const real = await realPathOf($, named)
     if (real !== undefined && isFullChromium(real, base)) return true
   }
   return false
 }
 
-// Points an unset CHROME_PATH at the best browser Playwright's folder holds,
-// and one that runs its full Chromium at the headless shell. Any other
-// CHROME_PATH is someone's own choice and stays.
-async function pointChromePath($: EngineInterface): Promise<ChromeChange | undefined> {
-  const current = await $.env.get('CHROME_PATH')
-  const browsers = await $.env.get('PLAYWRIGHT_BROWSERS_PATH')
-  if (browsers === undefined || !(await $.fs.exists(browsers))) return undefined
-  if (current !== undefined && !(await runsFullChromium($, current, browsers))) return undefined
-  const names = (await $.fs.list(browsers)).filter(e => e.kind === 'dir').map(e => e.name)
-  // Only the shell is worth putting in place of the full Chromium.
-  for (const { headlessShell, builds, binary } of CANDIDATES.filter(c => current === undefined || c.headlessShell)) {
+// The newest browser of one kind in Playwright's folder: the headless shell,
+// or the full Chromium.
+async function newestBrowser($: EngineInterface, browsers: string, names: readonly string[], headlessShell: boolean) {
+  for (const { builds, binary } of CANDIDATES.filter(c => c.headlessShell === headlessShell)) {
     const folder = newestChromium(names, headlessShell)
     if (folder === undefined) continue
     for (const build of builds) {
       const path = joinPath(joinPath(joinPath(browsers, folder), build), binary)
-      if (!(await $.fs.exists(path))) continue
-      const change: ChromeChange = { path }
-      if (current !== undefined) change.replaced = current
-      const { deny } = await $.env.set('CHROME_PATH', path)
-      if (deny !== undefined) change.deny = deny
-      return change
+      if (await $.fs.exists(path)) return path
     }
   }
   return undefined
+}
+
+// repo-prep's own script for the shell, put in place of one that ran the full
+// Chromium. Like the cloud image's, it adds --no-sandbox as root, where the
+// shell refuses to start without it, and cloud sessions run as root.
+// Undefined when it cannot be written and made runnable.
+async function shellWrapper($: EngineInterface, shell: string): Promise<string | undefined> {
+  const home = await $.env.get('HOME')
+  if (home === undefined || home === '') return undefined
+  const path = joinPath(joinPath(joinPath(home, '.cache'), 'repo-prep'), 'chrome-headless-shell')
+  const script = [
+    '#!/bin/sh',
+    "# Written by the repo-prep mod: Playwright's headless shell, with --no-sandbox as root.",
+    '[ "$(id -u)" -ne 0 ] || set -- --no-sandbox "$@"',
+    `exec '${shell.replaceAll("'", "'\\''")}' "$@"`,
+    '',
+  ].join('\n')
+  try {
+    await $.fs.write(path, script)
+    return (await $.process.run(['chmod', '755', path], { timeoutMs: GIT_TIMEOUT_MS })).exitCode === 0 ? path : undefined
+  } catch {
+    return undefined
+  }
+}
+
+// The browser variables' values. Each name is a literal at its call, which is
+// how `claude plugin validate` lists what the module reads and writes.
+async function browserVariables($: EngineInterface): Promise<[BrowserVariable, string | undefined][]> {
+  return [
+    ['CHROME_PATH', await $.env.get('CHROME_PATH')],
+    ['CHROME_BIN', await $.env.get('CHROME_BIN')],
+    ['PUPPETEER_EXECUTABLE_PATH', await $.env.get('PUPPETEER_EXECUTABLE_PATH')],
+  ]
+}
+
+async function setBrowserVariable($: EngineInterface, name: BrowserVariable, value: string) {
+  switch (name) {
+    case 'CHROME_PATH':
+      return $.env.set('CHROME_PATH', value)
+    case 'CHROME_BIN':
+      return $.env.set('CHROME_BIN', value)
+    case 'PUPPETEER_EXECUTABLE_PATH':
+      return $.env.set('PUPPETEER_EXECUTABLE_PATH', value)
+  }
+}
+
+// Points an unset CHROME_PATH at the best browser Playwright's folder holds,
+// and each browser variable that runs its full Chromium at the headless
+// shell, through repo-prep's wrapper. Any other value is someone's own choice
+// and stays, and CHROME_BIN and PUPPETEER_EXECUTABLE_PATH stay unset.
+async function pointChromePath($: EngineInterface): Promise<ChromeChange[]> {
+  const browsers = await $.env.get('PLAYWRIGHT_BROWSERS_PATH')
+  if (browsers === undefined || !(await $.fs.exists(browsers))) return []
+  const names = (await $.fs.list(browsers)).filter(e => e.kind === 'dir').map(e => e.name)
+  const shell = await newestBrowser($, browsers, names, true)
+  let wrapper: string | undefined
+  const changes: ChromeChange[] = []
+  for (const [name, current] of await browserVariables($)) {
+    let path: string | undefined
+    if (current === undefined) {
+      if (name === 'CHROME_PATH') path = shell ?? (await newestBrowser($, browsers, names, false))
+    } else if (shell !== undefined && (await runsFullChromium($, current, browsers))) {
+      // Only the shell is worth putting in place of the full Chromium.
+      wrapper ??= (await shellWrapper($, shell)) ?? shell
+      path = wrapper
+    }
+    if (path === undefined) continue
+    const change: ChromeChange = { name, path }
+    if (path === wrapper && wrapper !== shell) change.shell = shell
+    if (current !== undefined) change.replaced = current
+    const { deny } = await setBrowserVariable($, name, path)
+    if (deny !== undefined) change.deny = deny
+    changes.push(change)
+  }
+  return changes
 }
 
 async function prepare($: EngineInterface, trusted: ReadonlySet<string>) {

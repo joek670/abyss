@@ -30,15 +30,22 @@ wrong:
   --dump-dom` hangs until killed when it gets a fresh `--user-data-dir`, as
   test runners give it, while the shell answers in under a second.
 
-  It does that when `CHROME_PATH` is unset, and in place of a `CHROME_PATH`
-  that runs Playwright's full Chromium: that binary, a link to it, or a
-  script of up to 64 KiB that names either. The cloud image seen in
-  November 2026 sets `CHROME_PATH=/usr/bin/google-chrome`, a script that
-  runs `exec /opt/pw-browsers/chromium "$@"`, a link to the full Chromium,
-  so there it puts the shell in its place. Any other `CHROME_PATH`, such as
-  a Chrome of your own, stays as it is. Without a shell, an unset
-  `CHROME_PATH` gets the newest `chromium-N/chrome-linux*/chrome`, and a set
-  one stays. `joek670/abyss`'s browser suites need it.
+  It does that when `CHROME_PATH` is unset, and in place of any of
+  `CHROME_PATH`, `CHROME_BIN` (Karma) and `PUPPETEER_EXECUTABLE_PATH`
+  (Puppeteer) that runs Playwright's full Chromium: that binary, a link to
+  it, or a script of up to 64 KiB that names either, by its path, through
+  `$PLAYWRIGHT_BROWSERS_PATH`, or beside the script (`$(dirname "$0")`).
+  The cloud image seen in November 2026 sets all three to
+  `/usr/bin/google-chrome`, a script that runs
+  `exec /opt/pw-browsers/chromium "$@"`, a link to the full Chromium. In
+  place of such a value it puts `~/.cache/repo-prep/chrome-headless-shell`,
+  a script of its own that runs the shell and, like the image's, adds
+  `--no-sandbox` as root, where the shell won't start without it. If it
+  can't write that script, the bare shell goes in. Any other value, such as
+  a Chrome of your own, stays as it is, and `CHROME_BIN` and
+  `PUPPETEER_EXECUTABLE_PATH` are never filled in. Without a shell, an
+  unset `CHROME_PATH` gets the newest `chromium-N/chrome-linux*/chrome`, and
+  a set one stays. `joek670/abyss`'s browser suites need it.
 
 It says what it did in one transcript line, and tells the model in a short
 system-prompt section only what changes how it works (hooks are on, compare
@@ -63,11 +70,13 @@ hooks repo-prep turns on. Set it with
 
 `claude plugin validate` lists it as: hooks `session.start`,
 `command.run{command=repo-prep}`, `prompt.compose`; calls `$.process.run`
-(git only), `$.fs.list` and `$.fs.exists`, `$.fs.stat` and `$.fs.read`
-(where `CHROME_PATH` leads, and a script's text up to 64 KiB), `$.env.get`
-(`CHROME_PATH`, `PLAYWRIGHT_BROWSERS_PATH`) and `$.env.set`
-(`CHROME_PATH`), `$.session.root`, `$.command.register`, `$.ui.log`. No
-network, no model calls, no tool-call gates.
+(git, and `chmod` on its wrapper), `$.fs.list` and `$.fs.exists`,
+`$.fs.stat` and `$.fs.read` (where a browser variable leads, and a script's
+text up to 64 KiB), `$.fs.write` (its wrapper), `$.env.get` (`CHROME_PATH`,
+`CHROME_BIN`, `PUPPETEER_EXECUTABLE_PATH`, `PLAYWRIGHT_BROWSERS_PATH`,
+`HOME`) and `$.env.set` (the first three), `$.session.root`,
+`$.command.register`, `$.ui.log`. No network, no model calls, no tool-call
+gates.
 
 ## Where it runs
 
