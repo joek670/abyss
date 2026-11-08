@@ -74,7 +74,12 @@ up. Run `/plugin` in a terminal session to see `ship-gate` among the active
 mods.
 
 The same copy is committed to `joek670/ai-tools` and `joek670/abyss`. Change
-both together. `joek670/ai-tools` lists it in `.claude-plugin/marketplace.json`.
+both together, and **raise `version` in `.claude-plugin/plugin.json` with
+every change**. A synced or installed copy only updates when the version
+changes. The large-result fix (47001ae) shipped at 0.1.0, the same version as
+the copy before it, so synced sessions kept the old code. That code read the
+"result exceeds maximum allowed tokens" notice as JSON and held every large
+pull request with `JSON Parse error: Unexpected identifier "Error"`. `joek670/ai-tools` lists it in `.claude-plugin/marketplace.json`.
 
 ## What it doesn't cover
 
