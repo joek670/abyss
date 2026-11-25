@@ -103,8 +103,10 @@ async function turnOnHooks(git: Git, owner: string | undefined, trusted: Readonl
   if (tracked.exitCode !== 0 || tracked.stdout.trim() === '') return
   // Read each scope's own value: Claude Code runs a mod's git with
   // core.hooksPath=/dev/null injected, which a plain --get would report.
+  // --includes, because a scoped read skips [include] files unless told to,
+  // and a global hooksPath set in an included file would be missed.
   const configured = async (scope: '--local' | '--global' | '--system') => {
-    const read = await git(['config', scope, '--get', 'core.hooksPath'])
+    const read = await git(['config', scope, '--includes', '--get', 'core.hooksPath'])
     return read.exitCode === 0 ? read.stdout.trim() : ''
   }
   const local = await configured('--local')
@@ -128,6 +130,28 @@ async function turnOnHooks(git: Git, owner: string | undefined, trusted: Readonl
         ? `it tracks hooks in ${HOOKS_DIR}, left off because its origin is not on GitHub`
         : `it tracks hooks in ${HOOKS_DIR}, left off because its owner (${owner}) is not in trustHooksFrom`,
     )
+    return
+  }
+  // The owner of origin says nothing about the files checked out: a fork's
+  // branch (gh pr checkout) or a file dropped into the folder would run too.
+  // So the hooks go on only when they are exactly origin's default branch's.
+  const base = await defaultBranch(git)
+  if (base === undefined) {
+    out.left.push(`it tracks hooks in ${HOOKS_DIR}, left off because origin has no default branch to compare them with`)
+    return
+  }
+  const tree = async (ref: string) => {
+    const read = await git(['rev-parse', '--verify', '--quiet', `${ref}:${HOOKS_DIR}`])
+    return read.exitCode === 0 ? read.stdout.trim() : undefined
+  }
+  const here = await tree('HEAD')
+  if (here === undefined || here !== (await tree(`refs/remotes/origin/${base}`))) {
+    out.left.push(`its ${HOOKS_DIR} differ from origin/${base}'s, so they were left off`)
+    return
+  }
+  const dirty = await git(['status', '--porcelain', '--ignored', '--untracked-files=all', '--', HOOKS_DIR])
+  if (dirty.exitCode !== 0 || dirty.stdout.trim() !== '') {
+    out.left.push(`${HOOKS_DIR} has changes or files git does not track, so its hooks were left off`)
     return
   }
   const set = await git(['config', '--local', 'core.hooksPath', HOOKS_DIR])

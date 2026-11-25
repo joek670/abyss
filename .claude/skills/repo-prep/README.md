@@ -9,10 +9,17 @@ wrong:
   pre-commit hook that rejects a literal Qdrant key. repo-prep runs
   `git config --local core.hooksPath .githooks` when the repository tracks
   files there, has no `core.hooksPath` of its own or in your global or
-  system git config, and its `origin` is a GitHub repository whose owner is
-  in `trustHooksFrom` (default `joek670`). A hook runs that repository's
-  code on every commit, so another owner's hooks, or a same-named owner on
-  another host, stay off.
+  system git config (included files counted), and its `origin` is a GitHub
+  repository whose owner is in `trustHooksFrom` (default `joek670`). A hook
+  runs that repository's code on every commit, so another owner's hooks, or
+  a same-named owner on another host, stay off. The owner of `origin` says
+  nothing about the files checked out, so the hooks also have to be exactly
+  those on origin's default branch (`HEAD:.githooks` equals
+  `origin/<default>:.githooks`), with nothing changed, untracked or ignored
+  in the folder. That is checked once, when the session starts. After that
+  the setting stays: checking out a fork's branch later (`gh pr checkout`)
+  runs that branch's hooks, and the `--local` setting covers every linked
+  worktree of the repository.
 - **The local default branch is stale.** A diff against a local `master`
   that is behind `origin/master` shows other people's changes as yours.
   repo-prep fast-forwards the local default branch (origin's HEAD, else
