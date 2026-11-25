@@ -19,6 +19,9 @@ type FakeRepo = {
   hooks?: string // `git ls-files -s -- .githooks` output
   hooksPath?: string // this repository's own (--local)
   globalHooksPath?: string
+  headHooks?: string | null // HEAD:.githooks tree; null when HEAD has none
+  baseHooks?: string // origin's default branch's .githooks tree
+  hooksStatus?: string // `git status --porcelain --ignored` of .githooks
   originHead?: string
   remote: string[]
   local: Record<string, { ahead: number; behind: number }>
@@ -37,9 +40,15 @@ function fakeGit(repo: FakeRepo, calls: string[][] = []): Git {
     const line = args.join(' ')
     if (line === 'remote get-url origin') return repo.origin === undefined ? fail(2, "error: No such remote 'origin'") : ok(repo.origin + '\n')
     if (line === 'ls-files -s -- .githooks') return ok(repo.hooks ?? '')
-    if (line === 'config --local --get core.hooksPath') return repo.hooksPath === undefined ? fail(1) : ok(repo.hooksPath + '\n')
-    if (line === 'config --global --get core.hooksPath') return repo.globalHooksPath === undefined ? fail(1) : ok(repo.globalHooksPath + '\n')
-    if (line === 'config --system --get core.hooksPath') return fail(1)
+    // Only the --includes reads see a value; a plain scoped read would miss one
+    // set in an [include] file, which is how globalHooksPath is set here.
+    if (line === 'config --local --includes --get core.hooksPath') return repo.hooksPath === undefined ? fail(1) : ok(repo.hooksPath + '\n')
+    if (line === 'config --global --includes --get core.hooksPath') return repo.globalHooksPath === undefined ? fail(1) : ok(repo.globalHooksPath + '\n')
+    if (line === 'config --system --includes --get core.hooksPath') return fail(1)
+    if (/^config --(local|global|system) --get core\.hooksPath$/.test(line)) return fail(1)
+    if (line === 'rev-parse --verify --quiet HEAD:.githooks') return repo.headHooks === null ? fail(1) : ok(`${repo.headHooks ?? 'tree1'}\n`)
+    if (cmd === 'rev-parse' && /^refs\/remotes\/origin\/[^:]+:\.githooks$/.test(rest[2] ?? '')) return ok(`${repo.baseHooks ?? 'tree1'}\n`)
+    if (line === 'status --porcelain --ignored --untracked-files=all -- .githooks') return ok(repo.hooksStatus ?? '')
     if (line === 'config --local core.hooksPath .githooks') {
       repo.hooksPath = '.githooks'
       return ok()
@@ -130,6 +139,32 @@ describe('git hooks', () => {
     const out = await prepRepo(fakeGit(r), 'ai-tools', MINE)
     expect(r.hooksPath).toBeUndefined()
     expect(out.left.join(' ')).toContain('your git config sets core.hooksPath to ~/.git-hooks for every repository')
+  })
+
+  test('leaves hooks off when they differ from origin\'s default branch, as on a fork\'s checked-out branch', async () => {
+    const r = repo({ headHooks: 'tree-from-fork' })
+    const out = await prepRepo(fakeGit(r), 'ai-tools', MINE)
+    expect(r.hooksPath).toBeUndefined()
+    expect(out.left.join(' ')).toContain(".githooks differ from origin/master's")
+    const none = repo({ headHooks: null })
+    await prepRepo(fakeGit(none), 'ai-tools', MINE)
+    expect(none.hooksPath).toBeUndefined()
+  })
+
+  test('leaves hooks off when .githooks has changed or untracked files', async () => {
+    for (const hooksStatus of [' M .githooks/pre-commit\n', '?? .githooks/pre-push\n', '!! .githooks/post-checkout\n']) {
+      const r = repo({ hooksStatus })
+      const out = await prepRepo(fakeGit(r), 'ai-tools', MINE)
+      expect(r.hooksPath).toBeUndefined()
+      expect(out.left.join(' ')).toContain('.githooks has changes or files git does not track')
+    }
+  })
+
+  test('leaves hooks off when origin has no default branch to compare with', async () => {
+    const r = repo({ remote: [], local: {} })
+    const out = await prepRepo(fakeGit(r), 'ai-tools', MINE)
+    expect(r.hooksPath).toBeUndefined()
+    expect(out.left.join(' ')).toContain('origin has no default branch to compare them with')
   })
 
   test('does nothing about hooks in a repository that tracks none', async () => {
@@ -295,6 +330,10 @@ type Host = {
   failRepo?: string
 }
 
+// The engine hands a hook native paths, so on Windows /home/user arrives as
+// C:\home\user. The fake host compares them as the POSIX paths the tests use.
+const posix = (path: string) => path.replace(/^[A-Za-z]:/, '').replace(/\\/g, '/')
+
 function fakeHost(on: On, host: Host) {
   const logs: string[] = []
   const envSets: Record<string, string | undefined> = {}
@@ -319,29 +358,29 @@ function fakeHost(on: On, host: Host) {
   })
   on('session.root', async () => ({ value: host.root }))
   on('fs.list', async ($, e) => {
-    if (e.path === host.root) {
+    if (posix(e.path) === host.root) {
       if (host.entries === undefined) throw new Error('EACCES: permission denied')
       return { value: host.entries.map(x => ({ ...x, size: 0, mtimeMs: 0, isLink: false })) }
     }
-    if (e.path === host.env.PLAYWRIGHT_BROWSERS_PATH) return { value: (host.browsers ?? []).map(name => ({ name, kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false })) }
-    throw new Error(`fs.list ${e.path}`)
+    if (posix(e.path) === host.env.PLAYWRIGHT_BROWSERS_PATH) return { value: (host.browsers ?? []).map(name => ({ name, kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false })) }
+    throw new Error(`fs.list ${posix(e.path)}`)
   })
-  on('fs.exists', async ($, e) => ({ value: (host.files ?? []).includes(e.path) }))
+  on('fs.exists', async ($, e) => ({ value: (host.files ?? []).includes(posix(e.path)) }))
   on('fs.stat', async ($, e) => {
-    const real = host.links?.[e.path] ?? e.path
-    if (!(host.files ?? []).includes(real)) throw new Error(`ENOENT: no such file or directory, stat '${e.path}'`)
+    const real = host.links?.[posix(e.path)] ?? posix(e.path)
+    if (!(host.files ?? []).includes(real)) throw new Error(`ENOENT: no such file or directory, stat '${posix(e.path)}'`)
     const kind = real === host.env.PLAYWRIGHT_BROWSERS_PATH ? ('dir' as const) : ('file' as const)
     // A file without text stands for a browser binary, far larger than a script.
     const size = host.texts?.[real]?.length ?? 250_000_000
-    return { value: { kind, size, mtimeMs: 0, isLink: real !== e.path, ...(e.resolve ? { realPath: real } : {}) } }
+    return { value: { kind, size, mtimeMs: 0, isLink: real !== posix(e.path), ...(e.resolve ? { realPath: real } : {}) } }
   })
   on('fs.write', async ($, e) => {
-    writes[e.path] = e.text
+    writes[posix(e.path)] = e.text
     return { value: undefined }
   })
   on('fs.read', async ($, e) => {
-    const text = host.texts?.[e.path]
-    if (text === undefined) throw new Error(`ENOENT: no such file or directory, open '${e.path}'`)
+    const text = host.texts?.[posix(e.path)]
+    if (text === undefined) throw new Error(`ENOENT: no such file or directory, open '${posix(e.path)}'`)
     return { value: text }
   })
   on('env.get', async ($, e) => ({ value: host.env[e.name] }))
